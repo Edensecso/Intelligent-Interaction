@@ -141,7 +141,7 @@ def scrape_players():
                 
                 price = "0.0"
                 position = "UNK"
-                pos_index = -1
+                pos_index: int = -1
                 
                 known_positions = ["POR", "DEF", "MED", "DEL", "GK", "MID", "FWD", "CEN"]
                 
@@ -155,7 +155,7 @@ def scrape_players():
                 # Find Price (usually before position)
                 if pos_index > -1:
                     # Look backwards from position for price
-                    for i in range(pos_index - 1, -1, -1):
+                    for i in range(int(pos_index) - 1, -1, -1):
                         t = text_content[i]
                         if re.search(r'\d', t) and (('€' in t) or ('m' in t) or re.match(r'^\d+(\.\d+)?$', t)):
                             price = t
