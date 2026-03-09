@@ -1,2 +1,5 @@
 .venv/
 players.json
+*.pdf
+.env
+__pycache__/
