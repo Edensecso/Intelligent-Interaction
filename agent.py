@@ -9,7 +9,7 @@ import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from smolagents import tool, CodeAgent, LiteLLMModel
+from smolagents import tool, ToolCallingAgent, LiteLLMModel
 
 load_dotenv()
 
@@ -29,7 +29,7 @@ _estado = {
 # ---------------------------------------------------------------------------
 
 def get_agent_model() -> LiteLLMModel:
-    """Modelo para el CodeAgent (genera código)."""
+    """Modelo para el ToolCallingAgent."""
     if os.getenv("GROQ_API_KEY"):
         return LiteLLMModel(model_id="groq/llama-3.1-8b-instant")
     if os.getenv("GOOGLE_API_KEY"):
@@ -146,17 +146,18 @@ def update_players() -> str:
 # ---------------------------------------------------------------------------
 
 INSTRUCTIONS = """Eres un asistente experto en UCL Fantasy (Champions League Fantasy).
-Responde siempre en español. Usa las herramientas en el orden lógico necesario.
-Al finalizar, guarda el resultado con save_result()."""
+Responde siempre en español.
 
-def crear_agente() -> CodeAgent:
+REGLA DE ORO: Ejecuta **ÚNICAMENTE** la herramienta que el usuario te pida explícitamente y luego detente.
+Si el usuario dice "Genera un equipo", tú **SOLO** llamas a `generate_team` y respondes con eso. NO llames a `generate_market`, ni a `analyze_team`, ni a ninguna otra herramienta hasta que el usuario te lo pida en su siguiente mensaje. ¡Ve estrictamente paso a paso!"""
+
+def crear_agente() -> ToolCallingAgent:
     model = get_agent_model()
-    return CodeAgent(
+    return ToolCallingAgent(
         tools=[generate_team, generate_market, analyze_team, analyze_market,
                update_players, save_result],
         model=model,
-        instructions=INSTRUCTIONS,
-        executor_kwargs={"timeout_seconds": 600},
+        max_steps=1,
     )
 
 
