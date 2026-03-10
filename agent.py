@@ -1,8 +1,8 @@
 """
-Agente Fantasy UCL — Ejecutor de Herramientas + Procesador Simple delegado.
+Agente Fantasy UCL — Ejecutor de Herramientas.
 
-El CodeAgent orquesta las herramientas (generar equipo, mercado, scraping).
-Cuando necesita analizar datos, delega al agente procesador_simple.
+El CodeAgent orquesta las herramientas: genera equipo/mercado,
+llama a procesador_simple.py para análisis, y guarda resultados.
 """
 
 import json
@@ -15,17 +15,17 @@ load_dotenv()
 
 
 # ---------------------------------------------------------------------------
-# Estado compartido entre herramientas (el agente no ve los JSON)
+# Estado compartido entre herramientas
 # ---------------------------------------------------------------------------
 
 _estado = {
-    "equipo": None,   # list[dict] — 11 jugadores
-    "mercado": None,  # list[dict] — 15 jugadores
+    "equipo": None,
+    "mercado": None,
 }
 
 
 # ---------------------------------------------------------------------------
-# Configuración de modelos
+# Configuración del modelo
 # ---------------------------------------------------------------------------
 
 def get_agent_model() -> LiteLLMModel:
@@ -40,42 +40,8 @@ def get_agent_model() -> LiteLLMModel:
     )
 
 
-def get_proc_model() -> LiteLLMModel:
-    """Modelo para el procesador simple (lenguaje natural)."""
-    if os.getenv("GROQ_API_KEY"):
-        return LiteLLMModel(model_id="groq/llama-3.1-8b-instant")
-    if os.getenv("GOOGLE_API_KEY"):
-        return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
-    return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen3:14b')}",
-        api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-    )
-
-
 # ---------------------------------------------------------------------------
-# Herramientas del procesador simple (para el agente subordinado)
-# ---------------------------------------------------------------------------
-
-@tool
-def get_team_data() -> str:
-    """Devuelve los datos completos del equipo actual en formato JSON
-    para que el procesador los analice."""
-    if not _estado["equipo"]:
-        return "No hay equipo generado."
-    return json.dumps(_estado["equipo"], ensure_ascii=False)
-
-
-@tool
-def get_market_data() -> str:
-    """Devuelve los datos completos del mercado actual en formato JSON
-    para que el procesador los analice."""
-    if not _estado["mercado"]:
-        return "No hay mercado generado."
-    return json.dumps(_estado["mercado"], ensure_ascii=False)
-
-
-# ---------------------------------------------------------------------------
-# Herramientas del agente principal (ejecutor)
+# Herramientas (@tool)
 # ---------------------------------------------------------------------------
 
 @tool
@@ -105,13 +71,34 @@ def generate_market() -> str:
 
 
 @tool
+def analyze_team() -> str:
+    """Analiza el equipo actual usando el procesador simple (qwen3:14b).
+    Devuelve un resumen en lenguaje natural."""
+    from procesador_simple import procesar_equipo, get_model
+    if not _estado["equipo"]:
+        return "Error: primero genera un equipo con generate_team()."
+    model = get_model()
+    return procesar_equipo(_estado["equipo"], model)
+
+
+@tool
+def analyze_market() -> str:
+    """Analiza el mercado actual usando el procesador simple (qwen3:14b).
+    Recomienda los 3 mejores fichajes."""
+    from procesador_simple import procesar_mercado, get_model
+    if not _estado["mercado"]:
+        return "Error: primero genera el mercado con generate_market()."
+    model = get_model()
+    return procesar_mercado(_estado["mercado"], model)
+
+
+@tool
 def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     """Guarda el resultado completo (equipo, mercado y análisis) en un archivo de texto.
-    Llama a esta herramienta al final, después de tener los análisis.
 
     Args:
-        analisis_equipo: Texto del análisis del equipo generado por el procesador simple.
-        analisis_mercado: Texto del análisis del mercado generado por el procesador simple.
+        analisis_equipo: Texto del análisis del equipo.
+        analisis_mercado: Texto del análisis del mercado.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"resultado_{timestamp}.txt"
@@ -119,21 +106,18 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     lines = []
     lines.append(f"=== RESULTADO FANTASY UCL — {datetime.now().strftime('%d/%m/%Y %H:%M')} ===\n")
 
-    # Equipo
     lines.append("--- EQUIPO ---")
     if _estado["equipo"]:
         for p in _estado["equipo"]:
             lines.append(f"  {p['position']} - {p['name']} ({p['price']}) | Pts: {p.get('ptos_total', 0)} | Forma: {p.get('estado_forma', 'N/A')}")
     lines.append("")
 
-    # Mercado
     lines.append("--- MERCADO ---")
     if _estado["mercado"]:
         for p in _estado["mercado"]:
             lines.append(f"  {p['position']} - {p['name']} ({p['price']}) | Pts: {p.get('ptos_total', 0)} | Forma: {p.get('estado_forma', 'N/A')}")
     lines.append("")
 
-    # Análisis
     lines.append("--- ANÁLISIS DEL EQUIPO ---")
     lines.append(analisis_equipo)
     lines.append("")
@@ -149,8 +133,7 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
 @tool
 def update_players() -> str:
     """Ejecuta el scraping de jugadores de UCL Fantasy desde la web de UEFA.
-    Actualiza el archivo players.json con los datos más recientes.
-    AVISO: requiere Chrome instalado y tarda varios minutos."""
+    Actualiza el archivo players.json. Requiere Chrome y tarda varios minutos."""
     from scrap_champions import scrape_players
     scrape_players()
     with open("players.json", encoding="utf-8") as f:
@@ -159,43 +142,19 @@ def update_players() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Creación de agentes
+# Agente
 # ---------------------------------------------------------------------------
 
 INSTRUCTIONS = """Eres un asistente experto en UCL Fantasy (Champions League Fantasy).
-Responde siempre en español. Cuando el usuario pida algo relacionado con su equipo,
-usa las herramientas en el orden lógico necesario.
-Para analizar el equipo o el mercado, delega al agente 'procesador_simple'.
-Al finalizar, guarda todo el resultado en un archivo de texto con save_result()."""
-
-
-def crear_procesador_simple() -> CodeAgent:
-    """Crea el agente procesador simple: analiza equipo y mercado en lenguaje natural."""
-    return CodeAgent(
-        tools=[get_team_data, get_market_data],
-        model=get_proc_model(),
-        name="procesador_simple",
-        description=(
-            "Agente analista de fantasy fútbol. Llámalo cuando necesites un análisis "
-            "en lenguaje natural del equipo actual o del mercado. "
-            "Sabe obtener los datos internamente, solo dile qué quieres analizar."
-        ),
-        instructions=(
-            "Eres un analista experto de UCL Fantasy. Responde siempre en español. "
-            "Usa get_team_data() u get_market_data() para acceder a los datos "
-            "y proporciona análisis breves y útiles."
-        ),
-    )
-
+Responde siempre en español. Usa las herramientas en el orden lógico necesario.
+Al finalizar, guarda el resultado con save_result()."""
 
 def crear_agente() -> CodeAgent:
-    """Crea el agente principal (orquestador)."""
-    procesador = crear_procesador_simple()
     model = get_agent_model()
     return CodeAgent(
-        tools=[generate_team, generate_market, update_players, save_result],
+        tools=[generate_team, generate_market, analyze_team, analyze_market,
+               update_players, save_result],
         model=model,
-        managed_agents=[procesador],
         instructions=INSTRUCTIONS,
         executor_kwargs={"timeout_seconds": 600},
     )
