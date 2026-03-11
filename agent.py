@@ -161,11 +161,33 @@ def crear_agente() -> ToolCallingAgent:
     )
 
 
+
+# ---------------------------------------------------------------------------
+# Router: decide si delegar al agente o responder directamente
+# ---------------------------------------------------------------------------
+
+# Palabras clave que indican que el usuario quiere usar una herramienta
+_KEYWORDS_AGENTE = [
+    "equipo", "team", "mercado", "market",
+    "analiza", "analizar", "análisis", "analyze",
+    "guarda", "guardar", "save",
+    "actualiza", "actualizar", "update", "scraping",
+    "recomienda", "recomendar", "fichaje",
+]
+
+def _necesita_agente(texto: str) -> bool:
+    """Devuelve True si el mensaje contiene alguna palabra clave de acción."""
+    texto_lower = texto.lower()
+    return any(kw in texto_lower for kw in _KEYWORDS_AGENTE)
+
+
 if __name__ == "__main__":
     agente = crear_agente()
 
     print("=== Agente Fantasy UCL ===")
-    print("Escribe tu petición (o 'salir' para terminar)\n")
+    print("Comandos disponibles: generar equipo, generar mercado, analizar equipo,")
+    print("analizar mercado, guardar resultado, actualizar jugadores")
+    print("(o 'salir' para terminar)\n")
 
     while True:
         pregunta = input("Tú: ").strip()
@@ -174,5 +196,22 @@ if __name__ == "__main__":
             break
         if not pregunta:
             continue
-        respuesta = agente.run(pregunta)
+
+        if _necesita_agente(pregunta):
+            # Solo delegamos al agente si el mensaje tiene palabras de acción
+            respuesta = agente.run(pregunta)
+        else:
+            # Para saludos o preguntas generales, respondemos directamente
+            respuesta = (
+                "¡Hola! Soy tu asistente de UCL Fantasy. Puedo ayudarte con:\n"
+                "  • 'genera un equipo' → crea 11 jugadores aleatorios\n"
+                "  • 'genera el mercado' → muestra 15 jugadores disponibles\n"
+                "  • 'analiza el equipo' → resumen del equipo en lenguaje natural\n"
+                "  • 'analiza el mercado' → recomendaciones de fichaje\n"
+                "  • 'guarda el resultado' → exporta todo a un archivo .txt\n"
+                "  • 'actualiza jugadores' → scrapea los datos más recientes de UEFA\n"
+                "\n¿Qué quieres hacer?"
+            )
+
         print(f"\nAgente: {respuesta}\n")
+
