@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy UCL — Squad Builder</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+</head>
+<body>
+
+    <!-- ========== HEADER ========== -->
+    <header class="header">
+        <h1>⚽ Fantasy <span>UCL</span> — Squad Builder</h1>
+    </header>
+
+    <!-- ========== MAIN ========== -->
+    <div class="main-container">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <!-- Formación -->
+            <div class="sidebar-section">
+                <h3>Formación</h3>
+                <div class="formation-grid" id="formation-grid"></div>
+            </div>
+
+            <!-- Squad Info -->
+            <div class="sidebar-section">
+                <h3>Info del equipo</h3>
+                <div class="squad-info-box">
+                    <div class="info-row">
+                        <span class="label">Jugadores</span>
+                        <span class="value" id="info-players">0 / 11</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Precio total</span>
+                        <span class="value highlight" id="info-price">0.0m</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Puntos totales</span>
+                        <span class="value" id="info-pts">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Media puntos</span>
+                        <span class="value" id="info-avg">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="sidebar-section">
+                <h3>Acciones</h3>
+                <button class="btn-save" id="btn-save" disabled onclick="openSaveModal()">
+                    💾 Guardar Plantilla
+                </button>
+                <div style="height: 10px;"></div>
+                <button class="btn-clear" onclick="clearSquad()">
+                    🗑️ Limpiar Equipo
+                </button>
+            </div>
+        </aside>
+
+        <!-- CAMPO DE FÚTBOL -->
+        <div class="pitch-container">
+            <div class="pitch">
+                <div class="pitch-bg"></div>
+                <!-- Líneas del campo -->
+                <div class="pitch-lines"></div>
+                <div class="pitch-center-circle"></div>
+                <div class="pitch-center-dot"></div>
+                <div class="pitch-area-top"></div>
+                <div class="pitch-area-top-small"></div>
+                <div class="pitch-area-bottom"></div>
+                <div class="pitch-area-bottom-small"></div>
+                <!-- Slots de jugadores -->
+                <div id="pitch-slots"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MODAL SELECTOR DE JUGADORES ========== -->
+    <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this) closeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Seleccionar <span id="modal-pos-label">Jugador</span></h2>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-search">
+                <input type="text" id="modal-search" placeholder="Buscar jugador por nombre..." autocomplete="off">
+            </div>
+            <div class="modal-players-list" id="modal-players-list">
+                <!-- Se rellena dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MODAL GUARDAR ========== -->
+    <div class="modal-overlay" id="save-overlay" onclick="if(event.target===this) closeSaveModal()">
+        <div class="modal save-modal">
+            <div class="modal-header">
+                <h2>💾 Guardar <span>Plantilla</span></h2>
+                <button class="modal-close" onclick="closeSaveModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <label for="save-filename">Nombre del archivo (sin extensión):</label>
+                <input type="text" id="save-filename" placeholder="mi_equipo" autocomplete="off">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-cancel" onclick="closeSaveModal()">Cancelar</button>
+                <button class="btn-modal-save" onclick="saveSquad()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== TOAST ========== -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
