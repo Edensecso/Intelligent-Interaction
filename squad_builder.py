@@ -36,29 +36,17 @@ def get_players():
 
 @app.route('/api/save', methods=['POST'])
 def save_squad():
-    """Guarda la plantilla como archivo .txt."""
+    """Guarda la plantilla como archivo .json con el mismo formato que players.json."""
     data = request.get_json()
     filename = data.get('filename', 'mi_equipo')
     squad = data.get('squad', [])
 
-    if not filename.endswith('.txt'):
-        filename += '.txt'
-
-    now = datetime.now().strftime('%d/%m/%Y %H:%M')
-
-    lines = [f"=== RESULTADO FANTASY UCL — {now} ===", "", "--- EQUIPO ---"]
-
-    for player in squad:
-        pos = player.get('position', '???')
-        name = player.get('name', 'Desconocido')
-        price = player.get('price', '0m')
-        pts = player.get('ptos_total', '0')
-        forma = player.get('estado_forma', '0.0 stars')
-        lines.append(f"  {pos} - {name} ({price}) | Pts: {pts} | Forma: {forma}")
+    if not filename.endswith('.json'):
+        filename += '.json'
 
     output_path = os.path.join(os.path.dirname(__file__), filename)
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(lines) + '\n')
+        json.dump(squad, f, ensure_ascii=False, indent=4)
 
     return jsonify({'success': True, 'path': output_path})
 

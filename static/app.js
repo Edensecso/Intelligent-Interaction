@@ -3,7 +3,6 @@
 // =============================================
 
 // ---------- FORMACIONES: posiciones (x%, y%) en el campo ----------
-// Cada slot: { x, y, pos (posición JSON), label (etiqueta visual) }
 const FORMATION_LAYOUTS = {
     '433': [
         { x: 50, y: 91, pos: 'POR', label: 'POR' },
@@ -100,7 +99,7 @@ const FORMATION_LAYOUTS = {
 
 // ---------- ESTADO GLOBAL ----------
 let currentFormation = '433';
-let squad = new Array(11).fill(null);   // 11 slots
+let squad = new Array(11).fill(null);
 let allPlayers = [];
 let activeSlotIndex = null;
 
@@ -162,7 +161,6 @@ function renderPitch() {
         }
 
         el.addEventListener('click', (e) => {
-            // Si clic en el botón de remove, quitar jugador
             if (e.target.classList.contains('remove-btn')) {
                 squad[idx] = null;
                 renderPitch();
@@ -189,7 +187,7 @@ function filledCardHTML(player, label) {
     const pts = player.ptos_total || '0';
     return `
         <div class="player-card filled">
-            <span class="remove-btn" title="Quitar">✕</span>
+            <span class="remove-btn" title="Quitar">X</span>
             <div class="player-rating-badge">${pts}</div>
             <div class="player-name">${player.name}</div>
             <div class="player-price">${player.price}</div>
@@ -203,14 +201,14 @@ function starsHTML(forma) {
     const val = parseFloat(forma);
     let html = '';
     for (let i = 1; i <= 5; i++) {
-        if (val >= i) html += '★';
-        else if (val >= i - 0.5) html += '★'; // se simplifica a estrella llena
-        else html += '<span class="empty">★</span>';
+        if (val >= i) html += '<span style="color:#ffd700">&#9733;</span>';
+        else if (val >= i - 0.5) html += '<span style="color:#ffd700">&#9733;</span>';
+        else html += '<span class="empty">&#9733;</span>';
     }
     return html;
 }
 
-// ---------- MODAL DE SELECCIÓN ----------
+// ---------- MODAL DE SELECCION ----------
 function openPlayerModal(slotIndex, position) {
     activeSlotIndex = slotIndex;
     const overlay = document.getElementById('modal-overlay');
@@ -223,7 +221,6 @@ function openPlayerModal(slotIndex, position) {
 
     renderPlayerList(position, '');
 
-    // Eventos
     searchInput.oninput = () => renderPlayerList(position, searchInput.value);
     searchInput.focus();
 }
@@ -249,11 +246,10 @@ function renderPlayerList(position, search) {
         filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
     }
 
-    // Ordenar por puntos desc
     filtered.sort((a, b) => parseInt(b.ptos_total || '0') - parseInt(a.ptos_total || '0'));
 
     if (filtered.length === 0) {
-        list.innerHTML = '<div style="padding:20px;text-align:center;color:#4a5270;">No se encontraron jugadores</div>';
+        list.innerHTML = '<div style="padding:20px;text-align:center;color:#4a6088;">No se encontraron jugadores</div>';
         return;
     }
 
@@ -283,7 +279,6 @@ function renderPlayerList(position, search) {
             </div>`;
     }).join('');
 
-    // Click handlers
     list.querySelectorAll('.modal-player-row:not(.disabled)').forEach(row => {
         row.addEventListener('click', () => {
             const name = row.dataset.name;
@@ -307,53 +302,40 @@ function updateSquadInfo() {
     const filled = squad.filter(Boolean);
     document.getElementById('info-players').textContent = `${filled.length} / 11`;
 
-    // Precio total
     let totalPrice = 0;
     filled.forEach(p => {
         totalPrice += parseFloat((p.price || '0').replace('m', ''));
     });
     document.getElementById('info-price').textContent = totalPrice.toFixed(1) + 'm';
 
-    // Puntos totales
     let totalPts = 0;
     filled.forEach(p => {
         totalPts += parseInt(p.ptos_total || '0');
     });
     document.getElementById('info-pts').textContent = totalPts;
 
-    // Media puntos
     const avg = filled.length > 0 ? (totalPts / filled.length).toFixed(1) : '0';
     document.getElementById('info-avg').textContent = avg;
 
-    // Botón de guardar
     document.getElementById('btn-save').disabled = filled.length < 11;
 }
 
-// ---------- GUARDAR ----------
-function openSaveModal() {
-    document.getElementById('save-overlay').classList.add('active');
-    const input = document.getElementById('save-filename');
-    input.value = 'mi_equipo';
-    input.focus();
-    input.select();
-}
-
-function closeSaveModal() {
-    document.getElementById('save-overlay').classList.remove('active');
-}
-
+// ---------- GUARDAR (inline estilo FUTBIN) ----------
 async function saveSquad() {
-    const filename = document.getElementById('save-filename').value.trim();
-    if (!filename) return;
+    const input = document.getElementById('save-filename');
+    const filename = input.value.trim();
+    if (!filename) {
+        input.focus();
+        showToast('Escribe un nombre para la plantilla', true);
+        return;
+    }
 
     const layout = FORMATION_LAYOUTS[currentFormation];
-    const orderedSquad = [];
-
-    // Ordenar: POR, DEF, CEN, DEL
     const posOrder = { 'POR': 0, 'DEF': 1, 'CEN': 2, 'DEL': 3 };
     const indexed = squad.map((p, i) => ({ player: p, slot: layout[i] }));
     indexed.sort((a, b) => posOrder[a.slot.pos] - posOrder[b.slot.pos]);
 
+    const orderedSquad = [];
     indexed.forEach(item => {
         if (item.player) orderedSquad.push(item.player);
     });
@@ -365,12 +347,11 @@ async function saveSquad() {
     });
 
     const data = await res.json();
-    closeSaveModal();
 
     if (data.success) {
-        showToast('✅ Plantilla guardada como ' + filename + '.txt');
+        showToast('Plantilla guardada como ' + filename + '.json');
     } else {
-        showToast('❌ Error al guardar', true);
+        showToast('Error al guardar', true);
     }
 }
 
@@ -389,10 +370,14 @@ function showToast(message, isError = false) {
     setTimeout(() => { toast.className = 'toast'; }, 3000);
 }
 
-// ---------- CERRAR MODALES CON ESC ----------
+// ---------- ATAJOS TECLADO ----------
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeModal();
-        closeSaveModal();
+    }
+    // Enter en la barra de guardado
+    if (e.key === 'Enter' && document.activeElement === document.getElementById('save-filename')) {
+        const btn = document.getElementById('btn-save');
+        if (!btn.disabled) saveSquad();
     }
 });

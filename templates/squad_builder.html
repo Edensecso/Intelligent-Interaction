@@ -5,13 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantasy UCL — Squad Builder</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%BD</text></svg>">
 </head>
 <body>
 
+    <!-- UCL Starball background pattern -->
+    <svg class="ucl-bg-stars" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <polygon id="ucl-star" points="0,-50 11.8,-16.2 47.6,-15.5 19,6.2 29.4,40.5 0,20 -29.4,40.5 -19,6.2 -47.6,-15.5 -11.8,-16.2"/>
+        </defs>
+        <!-- Gran estrella central-derecha -->
+        <use href="#ucl-star" transform="translate(1250,400) scale(9)" fill="rgba(25,90,190,0.02)" stroke="rgba(77,160,255,0.07)" stroke-width="0.22" stroke-linejoin="round"/>
+        <!-- Estrella media superior-derecha -->
+        <use href="#ucl-star" transform="translate(1050,250) scale(6) rotate(36)" fill="rgba(20,80,170,0.015)" stroke="rgba(60,140,230,0.055)" stroke-width="0.28" stroke-linejoin="round"/>
+        <!-- Estrella media centro -->
+        <use href="#ucl-star" transform="translate(750,500) scale(7) rotate(15)" fill="rgba(20,80,180,0.012)" stroke="rgba(50,130,220,0.045)" stroke-width="0.25" stroke-linejoin="round"/>
+        <!-- Estrella grande inferior-izquierda -->
+        <use href="#ucl-star" transform="translate(350,700) scale(8) rotate(-20)" fill="rgba(25,85,180,0.015)" stroke="rgba(60,140,230,0.05)" stroke-width="0.24" stroke-linejoin="round"/>
+        <!-- Estrella superior-izquierda -->
+        <use href="#ucl-star" transform="translate(200,180) scale(5) rotate(10)" fill="none" stroke="rgba(77,160,255,0.05)" stroke-width="0.35" stroke-linejoin="round"/>
+        <!-- Estrella esquina superior-derecha -->
+        <use href="#ucl-star" transform="translate(1650,100) scale(4) rotate(-15)" fill="none" stroke="rgba(60,140,230,0.045)" stroke-width="0.4" stroke-linejoin="round"/>
+        <!-- Estrella inferior-derecha -->
+        <use href="#ucl-star" transform="translate(1500,800) scale(5.5) rotate(25)" fill="rgba(20,75,170,0.012)" stroke="rgba(55,130,220,0.045)" stroke-width="0.3" stroke-linejoin="round"/>
+        <!-- Estrella pequena izquierda -->
+        <use href="#ucl-star" transform="translate(80,500) scale(3)" fill="none" stroke="rgba(77,160,255,0.04)" stroke-width="0.5" stroke-linejoin="round"/>
+        <!-- Estrella centro-arriba -->
+        <use href="#ucl-star" transform="translate(600,120) scale(3.5) rotate(40)" fill="none" stroke="rgba(60,140,230,0.04)" stroke-width="0.45" stroke-linejoin="round"/>
+        <!-- Estrella abajo centro -->
+        <use href="#ucl-star" transform="translate(900,880) scale(4.5) rotate(-10)" fill="none" stroke="rgba(50,130,215,0.04)" stroke-width="0.35" stroke-linejoin="round"/>
+        <!-- Estrella entre medio -->
+        <use href="#ucl-star" transform="translate(1800,500) scale(3) rotate(30)" fill="none" stroke="rgba(60,140,230,0.038)" stroke-width="0.45" stroke-linejoin="round"/>
+        <!-- Estrella extra esquina inf-izq -->
+        <use href="#ucl-star" transform="translate(50,900) scale(2.5) rotate(-25)" fill="none" stroke="rgba(55,130,220,0.035)" stroke-width="0.55" stroke-linejoin="round"/>
+        <!-- Lineas curvas del balon (costuras) -->
+        <path d="M 600,30 Q 850,200 900,450 Q 950,700 1200,850" fill="none" stroke="rgba(60,140,230,0.045)" stroke-width="1.2"/>
+        <path d="M 1100,-30 Q 1250,180 1350,420 Q 1430,630 1750,580" fill="none" stroke="rgba(55,130,220,0.04)" stroke-width="1.2"/>
+        <path d="M -40,350 Q 180,300 380,450 Q 580,600 750,520" fill="none" stroke="rgba(50,125,215,0.035)" stroke-width="1.2"/>
+        <path d="M 1400,20 Q 1500,300 1350,550 Q 1200,780 1500,950" fill="none" stroke="rgba(55,130,220,0.035)" stroke-width="1.1"/>
+        <path d="M 300,0 Q 250,250 450,400 Q 650,550 500,800" fill="none" stroke="rgba(50,125,215,0.03)" stroke-width="1.1"/>
+        <path d="M -20,700 Q 250,600 500,700 Q 800,810 1100,700" fill="none" stroke="rgba(50,125,215,0.03)" stroke-width="1"/>
+        <path d="M 900,0 Q 1050,150 1100,350 Q 1150,550 950,700" fill="none" stroke="rgba(55,130,220,0.032)" stroke-width="1"/>
+        <path d="M 1600,300 Q 1700,500 1600,700 Q 1500,900 1700,1050" fill="none" stroke="rgba(50,125,215,0.028)" stroke-width="1"/>
+    </svg>
+
     <!-- ========== HEADER ========== -->
     <header class="header">
-        <h1>⚽ Fantasy <span>UCL</span> — Squad Builder</h1>
+        <h1>Fantasy <span>UCL</span> — Squad Builder</h1>
     </header>
 
     <!-- ========== MAIN ========== -->
@@ -19,9 +59,9 @@
 
         <!-- SIDEBAR -->
         <aside class="sidebar">
-            <!-- Formación -->
+            <!-- Formacion -->
             <div class="sidebar-section">
-                <h3>Formación</h3>
+                <h3>Formacion</h3>
                 <div class="formation-grid" id="formation-grid"></div>
             </div>
 
@@ -48,24 +88,30 @@
                 </div>
             </div>
 
+            <!-- Guardar -->
+            <div class="sidebar-section">
+                <h3>Guardar plantilla</h3>
+                <div class="save-bar">
+                    <input type="text" id="save-filename" placeholder="Nombre..." autocomplete="off">
+                    <button class="save-icon-btn" id="btn-save" disabled onclick="saveSquad()" title="Guardar plantilla">
+                        <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/></svg>
+                    </button>
+                </div>
+            </div>
+
             <!-- Acciones -->
             <div class="sidebar-section">
                 <h3>Acciones</h3>
-                <button class="btn-save" id="btn-save" disabled onclick="openSaveModal()">
-                    💾 Guardar Plantilla
-                </button>
-                <div style="height: 10px;"></div>
                 <button class="btn-clear" onclick="clearSquad()">
-                    🗑️ Limpiar Equipo
+                    Limpiar Equipo
                 </button>
             </div>
         </aside>
 
-        <!-- CAMPO DE FÚTBOL -->
+        <!-- CAMPO DE FUTBOL -->
         <div class="pitch-container">
             <div class="pitch">
                 <div class="pitch-bg"></div>
-                <!-- Líneas del campo -->
                 <div class="pitch-lines"></div>
                 <div class="pitch-center-circle"></div>
                 <div class="pitch-center-dot"></div>
@@ -73,7 +119,6 @@
                 <div class="pitch-area-top-small"></div>
                 <div class="pitch-area-bottom"></div>
                 <div class="pitch-area-bottom-small"></div>
-                <!-- Slots de jugadores -->
                 <div id="pitch-slots"></div>
             </div>
         </div>
@@ -84,32 +129,12 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>Seleccionar <span id="modal-pos-label">Jugador</span></h2>
-                <button class="modal-close" onclick="closeModal()">✕</button>
+                <button class="modal-close" onclick="closeModal()">X</button>
             </div>
             <div class="modal-search">
                 <input type="text" id="modal-search" placeholder="Buscar jugador por nombre..." autocomplete="off">
             </div>
-            <div class="modal-players-list" id="modal-players-list">
-                <!-- Se rellena dinámicamente -->
-            </div>
-        </div>
-    </div>
-
-    <!-- ========== MODAL GUARDAR ========== -->
-    <div class="modal-overlay" id="save-overlay" onclick="if(event.target===this) closeSaveModal()">
-        <div class="modal save-modal">
-            <div class="modal-header">
-                <h2>💾 Guardar <span>Plantilla</span></h2>
-                <button class="modal-close" onclick="closeSaveModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <label for="save-filename">Nombre del archivo (sin extensión):</label>
-                <input type="text" id="save-filename" placeholder="mi_equipo" autocomplete="off">
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal-cancel" onclick="closeSaveModal()">Cancelar</button>
-                <button class="btn-modal-save" onclick="saveSquad()">Guardar</button>
-            </div>
+            <div class="modal-players-list" id="modal-players-list"></div>
         </div>
     </div>
 
