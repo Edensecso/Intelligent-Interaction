@@ -1,15 +1,16 @@
 """
-Agente Fantasy UCL — Ejecutor de Herramientas.
+Agente Fantasy UCL — Ejecutor.
 
-El CodeAgent orquesta las herramientas: genera equipo/mercado,
-llama a procesador_simple.py para análisis, y guarda resultados.
+Puede usarse de dos formas:
+  - Como managed_agent del Analista: recibe una tarea y la ejecuta autónomamente.
+  - Standalone: python agent.py (loop interactivo básico).
 """
 
 import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from smolagents import tool, ToolCallingAgent, LiteLLMModel
+from smolagents import tool, CodeAgent, LiteLLMModel
 
 load_dotenv()
 
@@ -29,7 +30,6 @@ _estado = {
 # ---------------------------------------------------------------------------
 
 def get_agent_model() -> LiteLLMModel:
-    """Modelo para el ToolCallingAgent."""
     if os.getenv("GROQ_API_KEY"):
         return LiteLLMModel(model_id="groq/llama-3.1-8b-instant")
     if os.getenv("GOOGLE_API_KEY"):
@@ -45,9 +45,24 @@ def get_agent_model() -> LiteLLMModel:
 # ---------------------------------------------------------------------------
 
 @tool
+def load_team(filename: str = "plantilla.json") -> str:
+    """Carga el equipo desde un archivo JSON guardado por el usuario en la GUI.
+    Usar este tool cuando existe el archivo plantilla.json con el equipo elegido.
+
+    Args:
+        filename: Nombre del archivo JSON con el equipo (por defecto plantilla.json).
+    """
+    with open(filename, encoding="utf-8") as f:
+        equipo = json.load(f)
+    _estado["equipo"] = equipo
+    nombres = [f"  {p['position']} - {p['name']} ({p['price']})" for p in equipo]
+    return f"Equipo cargado desde {filename} ({len(equipo)} jugadores):\n" + "\n".join(nombres)
+
+
+@tool
 def generate_team() -> str:
     """Genera un equipo aleatorio de 11 jugadores de UCL Fantasy.
-    Devuelve un resumen con la formación y los nombres de los jugadores."""
+    Usar este tool solo si NO existe un archivo plantilla.json con el equipo del usuario."""
     from shuffle import shuffle_team
     equipo = shuffle_team()
     if not equipo:
@@ -59,11 +74,11 @@ def generate_team() -> str:
 
 @tool
 def generate_market() -> str:
-    """Genera un mercado de 15 jugadores disponibles para fichar.
-    Requiere haber generado un equipo primero."""
+    """Genera un mercado de 15 jugadores disponibles para fichar,
+    excluyendo los jugadores ya presentes en el equipo."""
     from procesador_simple import cargar_mercado
     if not _estado["equipo"]:
-        return "Error: primero genera un equipo con generate_team()."
+        return "Error: primero carga o genera un equipo."
     mercado = cargar_mercado(excluidos=_estado["equipo"])
     _estado["mercado"] = mercado
     nombres = [f"  {p['position']} - {p['name']} ({p['price']})" for p in mercado]
@@ -72,29 +87,28 @@ def generate_market() -> str:
 
 @tool
 def analyze_team() -> str:
-    """Analiza el equipo actual usando el procesador simple (qwen3:14b).
+    """Analiza el equipo actual con el procesador simple (qwen3:14b).
     Devuelve un resumen en lenguaje natural."""
     from procesador_simple import procesar_equipo, get_model
     if not _estado["equipo"]:
-        return "Error: primero genera un equipo con generate_team()."
-    model = get_model()
-    return procesar_equipo(_estado["equipo"], model)
+        return "Error: primero carga o genera un equipo."
+    return procesar_equipo(_estado["equipo"], get_model())
 
 
 @tool
 def analyze_market() -> str:
-    """Analiza el mercado actual usando el procesador simple (qwen3:14b).
+    """Analiza el mercado actual con el procesador simple (qwen3:14b).
     Recomienda los 3 mejores fichajes."""
     from procesador_simple import procesar_mercado, get_model
     if not _estado["mercado"]:
-        return "Error: primero genera el mercado con generate_market()."
-    model = get_model()
-    return procesar_mercado(_estado["mercado"], model)
+        return "Error: primero genera el mercado con generate_market."
+    return procesar_mercado(_estado["mercado"], get_model())
 
 
 @tool
 def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
-    """Guarda el resultado completo (equipo, mercado y análisis) en un archivo de texto.
+    """Guarda el resultado completo (equipo, mercado y análisis) en un archivo de texto
+    y devuelve el contenido completo del archivo guardado.
 
     Args:
         analisis_equipo: Texto del análisis del equipo.
@@ -106,16 +120,34 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     lines = []
     lines.append(f"=== RESULTADO FANTASY UCL — {datetime.now().strftime('%d/%m/%Y %H:%M')} ===\n")
 
+    def _fmt_player(p: dict) -> str:
+        fields = [
+            f"{p.get('position','?')} - {p.get('name','?')}",
+            f"Precio: {p.get('price','?')}",
+            f"Pts: {p.get('ptos_total','0')}",
+            f"Forma: {p.get('estado_forma','N/A')}",
+            f"Goles: {p.get('goles','0')}",
+            f"Asist: {p.get('asistencias','0')}",
+            f"Mins: {p.get('mins_jugados','0')}",
+            f"Equipo: {p.get('team_match','?')}",
+        ]
+        # Añadir cualquier otro campo que exista en el JSON
+        known = {'position','name','price','ptos_total','estado_forma','goles','asistencias','mins_jugados','team_match'}
+        extras = {k: v for k, v in p.items() if k not in known}
+        if extras:
+            fields.append(" | ".join(f"{k}: {v}" for k, v in extras.items()))
+        return "  " + " | ".join(fields)
+
     lines.append("--- EQUIPO ---")
     if _estado["equipo"]:
         for p in _estado["equipo"]:
-            lines.append(f"  {p['position']} - {p['name']} ({p['price']}) | Pts: {p.get('ptos_total', 0)} | Forma: {p.get('estado_forma', 'N/A')}")
+            lines.append(_fmt_player(p))
     lines.append("")
 
     lines.append("--- MERCADO ---")
     if _estado["mercado"]:
         for p in _estado["mercado"]:
-            lines.append(f"  {p['position']} - {p['name']} ({p['price']}) | Pts: {p.get('ptos_total', 0)} | Forma: {p.get('estado_forma', 'N/A')}")
+            lines.append(_fmt_player(p))
     lines.append("")
 
     lines.append("--- ANÁLISIS DEL EQUIPO ---")
@@ -124,10 +156,11 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     lines.append("--- ANÁLISIS DEL MERCADO ---")
     lines.append(analisis_mercado)
 
+    content = "\n".join(lines)
     with open(filename, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        f.write(content)
 
-    return f"Resultado guardado en {filename}"
+    return f"[Archivo: {filename}]\n\n{content}"
 
 
 @tool
@@ -145,49 +178,44 @@ def update_players() -> str:
 # Agente
 # ---------------------------------------------------------------------------
 
-INSTRUCTIONS = """Eres un asistente experto en UCL Fantasy (Champions League Fantasy).
-Responde siempre en español.
+INSTRUCTIONS = """Eres el agente ejecutor de UCL Fantasy. Responde siempre en español.
 
-REGLA DE ORO: Ejecuta **ÚNICAMENTE** la herramienta que el usuario te pida explícitamente y luego detente.
-Si el usuario dice "Genera un equipo", tú **SOLO** llamas a `generate_team` y respondes con eso. NO llames a `generate_market`, ni a `analyze_team`, ni a ninguna otra herramienta hasta que el usuario te lo pida en su siguiente mensaje. ¡Ve estrictamente paso a paso!"""
+Tu objetivo es preparar todos los datos del equipo y mercado para que el analista pueda tomar decisiones.
+Tienes estas herramientas disponibles: load_team, generate_team, generate_market, analyze_team, analyze_market, save_result, update_players.
 
-def crear_agente() -> ToolCallingAgent:
-    model = get_agent_model()
-    return ToolCallingAgent(
-        tools=[generate_team, generate_market, analyze_team, analyze_market,
-               update_players, save_result],
-        model=model,
-        max_steps=1,
+Usa load_team() si existe plantilla.json, o generate_team() si no hay equipo guardado.
+Cuando termines, devuelve el contenido completo que retorna save_result, que incluye los datos JSON de todos los jugadores."""
+
+
+def crear_agente() -> CodeAgent:
+    agente = CodeAgent(
+        tools=[load_team, generate_team, generate_market, analyze_team,
+               analyze_market, update_players, save_result],
+        model=get_agent_model(),
+        instructions=INSTRUCTIONS,
+        max_steps=8,
+        executor_kwargs={"timeout_seconds": 3600},
     )
-
+    # Atributos requeridos para usarse como managed_agent
+    agente.name = "ejecutor"
+    agente.description = (
+        "Agente ejecutor de UCL Fantasy. Carga el equipo del usuario desde plantilla.json "
+        "(o genera uno aleatorio si no existe), obtiene el mercado de jugadores disponibles, "
+        "analiza ambos con el procesador simple y guarda el resultado en un archivo .txt. "
+        "Devuelve el contenido completo del archivo con equipo, mercado y análisis."
+    )
+    return agente
 
 
 # ---------------------------------------------------------------------------
-# Router: decide si delegar al agente o responder directamente
+# Ejecución directa (standalone)
 # ---------------------------------------------------------------------------
-
-# Palabras clave que indican que el usuario quiere usar una herramienta
-_KEYWORDS_AGENTE = [
-    "equipo", "team", "mercado", "market",
-    "analiza", "analizar", "análisis", "analyze",
-    "guarda", "guardar", "save",
-    "actualiza", "actualizar", "update", "scraping",
-    "recomienda", "recomendar", "fichaje",
-]
-
-def _necesita_agente(texto: str) -> bool:
-    """Devuelve True si el mensaje contiene alguna palabra clave de acción."""
-    texto_lower = texto.lower()
-    return any(kw in texto_lower for kw in _KEYWORDS_AGENTE)
-
 
 if __name__ == "__main__":
     agente = crear_agente()
 
-    print("=== Agente Fantasy UCL ===")
-    print("Comandos disponibles: generar equipo, generar mercado, analizar equipo,")
-    print("analizar mercado, guardar resultado, actualizar jugadores")
-    print("(o 'salir' para terminar)\n")
+    print("=== Agente Ejecutor Fantasy UCL ===")
+    print("Comandos: analiza mi equipo, actualiza jugadores, (o 'salir')\n")
 
     while True:
         pregunta = input("Tú: ").strip()
@@ -196,22 +224,5 @@ if __name__ == "__main__":
             break
         if not pregunta:
             continue
-
-        if _necesita_agente(pregunta):
-            # Solo delegamos al agente si el mensaje tiene palabras de acción
-            respuesta = agente.run(pregunta)
-        else:
-            # Para saludos o preguntas generales, respondemos directamente
-            respuesta = (
-                "¡Hola! Soy tu asistente de UCL Fantasy. Puedo ayudarte con:\n"
-                "  • 'genera un equipo' → crea 11 jugadores aleatorios\n"
-                "  • 'genera el mercado' → muestra 15 jugadores disponibles\n"
-                "  • 'analiza el equipo' → resumen del equipo en lenguaje natural\n"
-                "  • 'analiza el mercado' → recomendaciones de fichaje\n"
-                "  • 'guarda el resultado' → exporta todo a un archivo .txt\n"
-                "  • 'actualiza jugadores' → scrapea los datos más recientes de UEFA\n"
-                "\n¿Qué quieres hacer?"
-            )
-
-        print(f"\nAgente: {respuesta}\n")
-
+        respuesta = agente.run(pregunta)
+        print(f"\nEjecutor: {respuesta}\n")

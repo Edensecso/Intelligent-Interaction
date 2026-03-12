@@ -318,6 +318,9 @@ function updateSquadInfo() {
     document.getElementById('info-avg').textContent = avg;
 
     document.getElementById('btn-save').disabled = filled.length < 11;
+
+    const analyzeBtn = document.getElementById('btn-analyze');
+    if (analyzeBtn) analyzeBtn.disabled = filled.length < 11;
 }
 
 // ---------- GUARDAR (inline estilo FUTBIN) ----------
@@ -368,6 +371,42 @@ function showToast(message, isError = false) {
     toast.textContent = message;
     toast.className = 'toast show' + (isError ? ' error' : '');
     setTimeout(() => { toast.className = 'toast'; }, 3000);
+}
+
+// ---------- ANALIZAR CON IA ----------
+async function analyzeSquad() {
+    const presupuesto = parseFloat(document.getElementById('presupuesto-input').value) || 0;
+    const btn = document.getElementById('btn-analyze');
+
+    btn.disabled = true;
+    btn.textContent = 'Analizando...';
+    showToast('El análisis puede tardar varios minutos...');
+
+    try {
+        const res = await fetch('/api/analizar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ squad: squad.filter(Boolean), presupuesto }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('results-content').textContent = data.resultado;
+            document.getElementById('results-overlay').classList.add('active');
+        } else {
+            showToast('Error: ' + data.error, true);
+        }
+    } catch (e) {
+        showToast('Error de conexión con el servidor', true);
+    } finally {
+        btn.disabled = squad.filter(Boolean).length < 11;
+        btn.textContent = 'Analizar con IA';
+    }
+}
+
+function closeResults() {
+    document.getElementById('results-overlay').classList.remove('active');
 }
 
 // ---------- ATAJOS TECLADO ----------

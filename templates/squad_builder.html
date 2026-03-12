@@ -106,6 +106,17 @@
                     Limpiar Equipo
                 </button>
             </div>
+
+            <!-- Análisis IA -->
+            <div class="sidebar-section">
+                <h3>Análisis IA</h3>
+                <div class="save-bar" style="margin-bottom:8px;">
+                    <input type="number" id="presupuesto-input" placeholder="Presupuesto (M)" min="0" step="0.5" style="border-radius:6px; border-right:1px solid rgba(40,80,140,0.5);">
+                </div>
+                <button class="btn-analyze" id="btn-analyze" disabled onclick="analyzeSquad()">
+                    Analizar con IA
+                </button>
+            </div>
         </aside>
 
         <!-- CAMPO DE FUTBOL -->
@@ -140,6 +151,17 @@
 
     <!-- ========== TOAST ========== -->
     <div class="toast" id="toast"></div>
+
+    <!-- ========== MODAL RESULTADOS IA ========== -->
+    <div class="modal-overlay" id="results-overlay" onclick="if(event.target===this) closeResults()">
+        <div class="modal results-modal">
+            <div class="modal-header">
+                <h2>Recomendación del <span>Analista IA</span></h2>
+                <button class="modal-close" onclick="closeResults()">X</button>
+            </div>
+            <div class="results-content" id="results-content"></div>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>

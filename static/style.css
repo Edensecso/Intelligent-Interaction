@@ -811,6 +811,56 @@ body::after {
     border-color: #c43a4a;
 }
 
+/* ---------- BOTÓN ANALIZAR IA ---------- */
+.btn-analyze {
+    background: transparent;
+    border: 1.5px solid rgba(40, 180, 100, 0.5);
+    color: #3dd68c;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.btn-analyze:hover:not(:disabled) {
+    background: rgba(40, 180, 100, 0.1);
+    border-color: #3dd68c;
+}
+
+.btn-analyze:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ---------- MODAL RESULTADOS IA ---------- */
+.results-modal {
+    width: 680px;
+    max-width: 92vw;
+    max-height: 80vh;
+}
+
+.results-content {
+    padding: 20px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #c8d8f0;
+    flex: 1;
+}
+
+.results-content::-webkit-scrollbar {
+    width: 5px;
+}
+
+.results-content::-webkit-scrollbar-thumb {
+    background: rgba(30, 70, 140, 0.4);
+    border-radius: 3px;
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-height: 800px) {
     .pitch {

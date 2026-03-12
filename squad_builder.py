@@ -50,6 +50,33 @@ def save_squad():
 
     return jsonify({'success': True, 'path': output_path})
 
+@app.route('/api/analizar', methods=['POST'])
+def analizar():
+    """Recibe el equipo seleccionado y el presupuesto, lanza el analista y devuelve la recomendación."""
+    data = request.get_json()
+    squad_data = data.get('squad', [])
+    presupuesto = float(data.get('presupuesto', 0))
+
+    # Guardar plantilla para que analista.py la lea en ejecutar_pipeline()
+    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
+    with open(plantilla_path, 'w', encoding='utf-8') as f:
+        json.dump(squad_data, f, ensure_ascii=False, indent=4)
+
+    try:
+        from analista import crear_analista
+        agente = crear_analista()
+        tarea = (
+            f"Tengo {presupuesto}M disponibles para fichajes (sin contar ingresos por ventas). "
+            "Analiza mi equipo actual y el mercado disponible, busca información reciente sobre "
+            "los jugadores más relevantes y recomiéndame qué vender y qué fichar para mejorar "
+            "mi plantilla de UCL Fantasy."
+        )
+        resultado = agente.run(tarea)
+        return jsonify({'success': True, 'resultado': str(resultado)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/formations')
 def get_formations():
     """Devuelve las formaciones disponibles."""
@@ -57,4 +84,5 @@ def get_formations():
     return jsonify(formations)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # use_reloader=False evita conflictos con subprocesos del CodeAgent
+    app.run(debug=True, port=5000, use_reloader=False)

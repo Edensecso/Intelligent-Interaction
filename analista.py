@@ -2,9 +2,9 @@
 Agente Analista — Cerebro del sistema Fantasy UCL.
 
 Punto de entrada principal del sistema. Coordina:
-  1. Ejecutar el pipeline de agent.py (equipo + mercado + análisis + .txt)
-  2. Buscar información de actualidad sobre jugadores/equipos via buscador.py
-  3. Tomar decisiones de fichajes respetando el presupuesto disponible del usuario
+  1. Delega en el ejecutor (agent.py) para generar equipo/mercado, analizar y guardar .txt
+  2. Busca información de actualidad sobre jugadores/equipos via buscador.py
+  3. Toma decisiones de fichajes respetando el presupuesto disponible del usuario
 
 Uso:
     python analista.py
@@ -33,34 +33,8 @@ def _get_model() -> LiteLLMModel:
 
 
 # ---------------------------------------------------------------------------
-# Herramientas
+# Herramientas propias del analista
 # ---------------------------------------------------------------------------
-
-@tool
-def ejecutar_pipeline() -> str:
-    """Genera un equipo y mercado aleatorios de UCL Fantasy, los analiza con el
-    procesador simple y guarda los resultados en un archivo .txt.
-    Devuelve el contenido completo del archivo con el equipo, mercado y análisis."""
-    import agent as ag
-
-    # Reset estado compartido del ejecutor
-    ag._estado["equipo"] = None
-    ag._estado["mercado"] = None
-
-    # Pipeline completo
-    ag.generate_team()
-    ag.generate_market()
-    analisis_equipo = str(ag.analyze_team())
-    analisis_mercado = str(ag.analyze_market())
-    resultado_msg = str(ag.save_result(analisis_equipo, analisis_mercado))
-
-    # Extraer nombre del archivo y devolver su contenido completo
-    # resultado_msg tiene la forma: "Resultado guardado en resultado_xxx.txt"
-    filename = resultado_msg.strip().split()[-1]
-    with open(filename, encoding="utf-8") as f:
-        content = f.read()
-    return f"[Archivo guardado: {filename}]\n\n{content}"
-
 
 @tool
 def buscar_jugador(pregunta: str) -> str:
@@ -82,44 +56,53 @@ def buscar_jugador(pregunta: str) -> str:
 
 INSTRUCTIONS = """Eres el analista jefe de UCL Fantasy. Responde siempre en español.
 
-Tu flujo de trabajo es el siguiente:
+REGLA CRÍTICA: Toda acción debe ir dentro de un bloque <code>...</code> y terminar con final_answer().
+NUNCA generes texto fuera de bloques de código. Ejemplo de respuesta correcta:
 
-PASO 1 — Ejecuta el pipeline:
-  Llama a `ejecutar_pipeline()` para obtener el equipo actual, el mercado disponible
-  y el análisis inicial generado por el procesador simple.
+<code>
+datos = ejecutor("Prepara los datos del equipo y mercado.")
+import glob
+archivo = sorted(glob.glob("resultado_*.txt"))[-1]
+with open(archivo, encoding="utf-8") as f:
+    contenido = f.read()
+info = buscar_jugador("¿Cuál es la forma actual de Erling Haaland en la UCL?")
+final_answer("🔴 VENTAS: ...\n🟢 FICHAJES: ...\n💰 BALANCE: ...\n📋 RESUMEN: ...")
+</code>
 
-PASO 2 — Identifica candidatos:
-  Del contenido del archivo lee:
-  - Los jugadores del equipo con peor rendimiento (pocos puntos, mala forma) → candidatos a vender
-  - Los jugadores del mercado con mejor rendimiento (muchos puntos, buena forma) → candidatos a fichar
+Tienes dos recursos:
+- El agente `ejecutor`: prepara datos del equipo y mercado y guarda resultado_*.txt con todos los campos.
+- La herramienta `buscar_jugador`: recibe una pregunta en lenguaje natural y devuelve info reciente de internet.
 
-PASO 3 — Busca información de actualidad (opcional pero recomendado):
-  Para los 2-3 jugadores más relevantes (top candidatos a vender o fichar), llama a
-  `buscar_jugador()` con su nombre y "UCL 2025 forma actual". Esto te dará contexto
-  real y reciente para justificar la decisión.
+OBLIGATORIO: Usa buscar_jugador las veces necesarias. La búsqueda web es CLAVE para tomar buenas decisiones:
+   sin información actual (lesiones, rachas, próximos rivales) no puedes hacer una recomendación fiable.
+   Ejemplo: buscar_jugador("¿Está lesionado Vinicius Jr y cuál es su forma en la UCL 2025?")
+   Combina los datos estadísticos del archivo con la información web para justificar cada decisión.
 
-PASO 4 — Toma las decisiones respetando el presupuesto:
-  El presupuesto total disponible = dinero del usuario + ingresos por ventas.
-  No lo superes en ningún caso.
+El presupuesto total = dinero del usuario + ingresos por ventas. No lo superes.
 
-En tu respuesta final incluye:
-  🔴 VENTAS recomendadas: jugador, precio de venta, motivo
-  🟢 FICHAJES recomendados: jugador, precio de fichaje, motivo (incluye info web si la tienes)
-  💰 BALANCE: ventas totales - fichajes totales = gasto neto vs presupuesto disponible
-  📋 RESUMEN: una frase con el objetivo de la operación (mejorar forma, reducir precio, ...)"""
+Respuesta final en final_answer():
+  🔴 VENTAS recomendadas: jugador, precio, motivo (con dato estadístico + contexto web)
+  🟢 FICHAJES recomendados: jugador, precio, motivo (con dato estadístico + contexto web)
+  💰 BALANCE económico final
+  📋 RESUMEN del objetivo"""
 
 
 # ---------------------------------------------------------------------------
-# Creación del agente
+# Creación del analista con el ejecutor como managed_agent
 # ---------------------------------------------------------------------------
 
 def crear_analista() -> CodeAgent:
+    from agent import crear_agente
+    ejecutor = crear_agente()
+
     return CodeAgent(
-        tools=[ejecutar_pipeline, buscar_jugador],
+        tools=[buscar_jugador],
         model=_get_model(),
+        managed_agents=[ejecutor],
         instructions=INSTRUCTIONS,
+        additional_authorized_imports=["json", "glob", "os"],
         max_steps=10,
-        executor_kwargs={"timeout_seconds": 600},
+        executor_kwargs={"timeout_seconds": 3600},
     )
 
 
@@ -140,7 +123,7 @@ if __name__ == "__main__":
     analista = crear_analista()
 
     tarea = (
-        f"Tengo {presupuesto}M disponibles para fichajes (sin contar lo que ingrese por ventas). "
+        f"Tengo {presupuesto}M disponibles para fichajes (sin contar ingresos por ventas). "
         "Analiza mi equipo actual y el mercado disponible, busca información reciente sobre "
         "los jugadores más relevantes y recomiéndame qué vender y qué fichar para mejorar "
         "mi plantilla de UCL Fantasy."
