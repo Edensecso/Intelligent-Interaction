@@ -60,23 +60,20 @@ REGLA CRÍTICA: Toda acción debe ir dentro de un bloque <code>...</code> y term
 NUNCA generes texto fuera de bloques de código. Ejemplo de respuesta correcta:
 
 <code>
-datos = ejecutor("Prepara los datos del equipo y mercado.")
-import glob
-archivo = sorted(glob.glob("resultado_*.txt"))[-1]
-with open(archivo, encoding="utf-8") as f:
-    contenido = f.read()
-info = buscar_jugador("¿Cuál es la forma actual de Erling Haaland en la UCL?")
+contenido = ejecutor("Prepara los datos del equipo y mercado.")
+info_jugador = buscar_jugador("¿Cuál es la forma actual de Erling Haaland en la UCL?")
 final_answer("🔴 VENTAS: ...\n🟢 FICHAJES: ...\n💰 BALANCE: ...\n📋 RESUMEN: ...")
 </code>
 
 Tienes dos recursos:
-- El agente `ejecutor`: prepara datos del equipo y mercado y guarda resultado_*.txt con todos los campos.
+- El agente `ejecutor`: devuelve directamente el contenido completo con equipo, mercado y análisis.
+  IMPORTANTE: El valor de retorno de ejecutor() ya contiene TODOS los datos — NO intentes abrir ningún archivo.
 - La herramienta `buscar_jugador`: recibe una pregunta en lenguaje natural y devuelve info reciente de internet.
 
 OBLIGATORIO: Usa buscar_jugador las veces necesarias. La búsqueda web es CLAVE para tomar buenas decisiones:
    sin información actual (lesiones, rachas, próximos rivales) no puedes hacer una recomendación fiable.
    Ejemplo: buscar_jugador("¿Está lesionado Vinicius Jr y cuál es su forma en la UCL 2025?")
-   Combina los datos estadísticos del archivo con la información web para justificar cada decisión.
+   Combina los datos estadísticos devueltos por ejecutor() con la información web para justificar cada decisión.
 
 El presupuesto total = dinero del usuario + ingresos por ventas. No lo superes.
 

@@ -190,9 +190,10 @@ Cuando termines, devuelve el contenido completo que retorna save_result, que inc
 def crear_agente() -> CodeAgent:
     agente = CodeAgent(
         tools=[load_team, generate_team, generate_market, analyze_team,
-               analyze_market, update_players, save_result],
+               analyze_market, save_result],
         model=get_agent_model(),
         instructions=INSTRUCTIONS,
+        additional_authorized_imports=["os", "json", "glob"],
         max_steps=8,
         executor_kwargs={"timeout_seconds": 3600},
     )
