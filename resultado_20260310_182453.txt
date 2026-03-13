@@ -1,0 +1,39 @@
+=== RESULTADO FANTASY UCL — 10/03/2026 18:24 ===
+
+--- EQUIPO ---
+  POR - M. Carnesecchi (4.7m) | Pts: 38 | Forma: 4.0 stars
+  DEF - V. Nielsen (3.8m) | Pts: 5 | Forma: 0.0 stars
+  DEF - Gabriel (5.7m) | Pts: 37 | Forma: 4.5 stars
+  DEF - A. Khusanov (4.5m) | Pts: 19 | Forma: 2.5 stars
+  DEF - N. Molina (4.8m) | Pts: 16 | Forma: 3.0 stars
+  CEN - R. Sallai (5m) | Pts: 31 | Forma: 0.5 stars
+  CEN - Bernardo Silva (6.3m) | Pts: 21 | Forma: 2.0 stars
+  CEN - J. Murphy (6.5m) | Pts: 25 | Forma: 2.0 stars
+  CEN - M. Araújo (5.6m) | Pts: 37 | Forma: 4.5 stars
+  CEN - X. Simons (6.6m) | Pts: 36 | Forma: 0.0 stars
+  DEL - G. Scamacca (6.2m) | Pts: 25 | Forma: 3.0 stars
+
+--- MERCADO ---
+  POR - B. Austin (4m) | Pts: 0 | Forma: 0.0 stars
+  POR - N. Lomb (4m) | Pts: 0 | Forma: 0.0 stars
+  DEL - L. Delap (6.4m) | Pts: 8 | Forma: 4.0 stars
+  CEN - S. Gnabry (6.4m) | Pts: 21 | Forma: 2.5 stars
+  CEN - T. Almada (4.7m) | Pts: 7 | Forma: 1.5 stars
+  DEL - K. Izekor (5m) | Pts: 0 | Forma: 0.0 stars
+  POR - N. Haikin (4.5m) | Pts: 29 | Forma: 0.0 stars
+  CEN - P. Sarr (6m) | Pts: 22 | Forma: 3.0 stars
+  CEN - B. Barcola (7.5m) | Pts: 30 | Forma: 4.5 stars
+  CEN - K. Sulemana (4.5m) | Pts: 7 | Forma: 2.5 stars
+  CEN - N. Zalewski (5.6m) | Pts: 13 | Forma: 4.0 stars
+  DEF - J. Gomez (3.8m) | Pts: 16 | Forma: 1.0 stars
+  CEN - M. Terrier (4.9m) | Pts: 1 | Forma: 3.5 stars
+  DEF - M. Alleyne (4.5m) | Pts: 0 | Forma: 0.0 stars
+  CEN - L. Trossard (6.9m) | Pts: 25 | Forma: 1.0 stars
+
+--- ANÁLISIS DEL EQUIPO ---
+Este equipo combina defensores sólidos, mediocampistas versátiles y un portero con buen rendimiento defensivo. El portero **M. Carnesecchi** (4.7m) destaca con 38 puntos y 3 porterías a 0, mientras que **Gabriel** (5.7m) aporta 37 puntos, un gol y 21 balones recuperados. El centrocampista **M. Araújo** (5.6m) también se destaca con 37 puntos y 44 balones recuperados. El precio medio aproximado oscila entre 4.5m y 6.6m. Aunque algunos jugadores como **Scamacca** (6.2m) tienen un buen partido reciente (6 puntos), su forma general es media.
+
+--- ANÁLISIS DEL MERCADO ---
+1. **N. Haikin (POR, 4.5m)**: 6.4 puntos por euro y 900 minutos jugados, destacando como portero con alta eficiencia y participación constante.  
+2. **B. Barcola (CEN, 7.5m)**: 4 puntos por euro y 3 asistencias, con un buen rendimiento en el centro del campo y alta selección (6%).  
+3. **S. Gnabry (CEN, 6.4m)**: 3.3 puntos por euro, 1 gol y 2 asistencias, mostrando versatilidad y aportación ofensiva en partidos clave.
