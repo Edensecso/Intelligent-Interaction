@@ -160,7 +160,31 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     with open(filename, "w", encoding="utf-8") as f:
         f.write(content)
 
-    return f"[Archivo: {filename}]\n\n{content}"
+    # Resumen compacto para el analista (evita saturar el contexto del LLM)
+    def _compact(jugadores, titulo):
+        rows = [titulo]
+        for p in jugadores:
+            rows.append(
+                f"  {p.get('position','?')} {p.get('name','?')} | "
+                f"{p.get('price','?')} | "
+                f"Pts:{p.get('ptos_total',0)} | "
+                f"Forma:{p.get('estado_forma','?')} | "
+                f"Pts/€:{p.get('ptos_por_euro',0)} | "
+                f"Goles:{p.get('goles',0)} | "
+                f"Asist:{p.get('asistencias',0)} | "
+                f"Mins:{p.get('mins_jugados',0)} | "
+                f"Prox:{p.get('prox_partido','?')}"
+            )
+        return "\n".join(rows)
+
+    resumen = (
+        f"[Archivo guardado: {filename}]\n\n"
+        + _compact(_estado["equipo"] or [], "EQUIPO:") + "\n\n"
+        + _compact(_estado["mercado"] or [], "MERCADO:") + "\n\n"
+        + f"ANÁLISIS EQUIPO:\n{analisis_equipo}\n\n"
+        + f"ANÁLISIS MERCADO:\n{analisis_mercado}"
+    )
+    return resumen
 
 
 @tool

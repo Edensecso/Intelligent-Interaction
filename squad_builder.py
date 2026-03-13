@@ -63,15 +63,8 @@ def analizar():
         json.dump(squad_data, f, ensure_ascii=False, indent=4)
 
     try:
-        from analista import crear_analista
-        agente = crear_analista()
-        tarea = (
-            f"Tengo {presupuesto}M disponibles para fichajes (sin contar ingresos por ventas). "
-            "Analiza mi equipo actual y el mercado disponible, busca información reciente sobre "
-            "los jugadores más relevantes y recomiéndame qué vender y qué fichar para mejorar "
-            "mi plantilla de UCL Fantasy."
-        )
-        resultado = agente.run(tarea)
+        from analista import analizar
+        resultado = analizar(presupuesto)
         return jsonify({'success': True, 'resultado': str(resultado)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -85,4 +78,4 @@ def get_formations():
 
 if __name__ == '__main__':
     # use_reloader=False evita conflictos con subprocesos del CodeAgent
-    app.run(debug=True, port=5000, use_reloader=False)
+    app.run(debug=True, port=5001, use_reloader=False)
