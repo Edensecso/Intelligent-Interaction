@@ -102,6 +102,13 @@
             <!-- Acciones -->
             <div class="sidebar-section">
                 <h3>Acciones</h3>
+                <button class="btn-clear" onclick="generateMarket()" style="border-color: #4db8ff; color: #4db8ff; margin-bottom: 8px;">
+                    Generar Mercado
+                </button>
+                <div id="market-view" class="market-view-list" style="display: none; margin-bottom: 8px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                    <h4 style="color: #4db8ff; margin-bottom: 5px; font-size: 0.9em;">Mercado Actual</h4>
+                    <ul id="market-list" style="list-style: none; padding: 0; font-size: 0.8em; color: #ccc;"></ul>
+                </div>
                 <button class="btn-clear" onclick="clearSquad()">
                     Limpiar Equipo
                 </button>
@@ -113,8 +120,8 @@
                 <div class="save-bar" style="margin-bottom:8px;">
                     <input type="number" id="presupuesto-input" placeholder="Presupuesto (M)" min="0" step="0.5" style="border-radius:6px; border-right:1px solid rgba(40,80,140,0.5);">
                 </div>
-                <button class="btn-analyze" id="btn-analyze" disabled onclick="analyzeSquad()">
-                    Analizar con IA
+                <button class="btn-analyze" id="btn-analyze" disabled onclick="toggleChat()">
+                    Charlar con el Analista
                 </button>
             </div>
         </aside>
@@ -131,6 +138,23 @@
                 <div class="pitch-area-bottom"></div>
                 <div class="pitch-area-bottom-small"></div>
                 <div id="pitch-slots"></div>
+            </div>
+        </div>
+
+        <!-- CHAT PANEL -->
+        <div class="chat-panel" id="chat-panel">
+            <div class="chat-header">
+                <h3>Analista <span>UCL</span></h3>
+                <button class="chat-close" onclick="toggleChat()">×</button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="msg bot-msg">¡Hola! Soy tu asistente de la UCL. Selecciona tu plantilla y pulsa "Charlar" para que analice tus jugadores o pregúntame lo que quieras.</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Pregunta algo..." autocomplete="off">
+                <button id="chat-send">
+                    <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
             </div>
         </div>
     </div>

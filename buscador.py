@@ -25,7 +25,7 @@ def _get_coder_model() -> LiteLLMModel:
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_AGENT_MODEL', 'qwen2.5-coder:14b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_AGENT_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
@@ -37,77 +37,51 @@ def _get_nl_model() -> LiteLLMModel:
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen3:14b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
 
 # ---------------------------------------------------------------------------
-# Fase 1: búsqueda web
-# ---------------------------------------------------------------------------
-
-_SEARCH_INSTRUCTIONS = """Eres un agente de búsqueda especializado en fútbol de la Champions League.
-Tu única tarea es buscar información reciente sobre el jugador o equipo indicado.
-Realiza la búsqueda y devuelve los resultados crudos tal como los encuentras, sin resumir."""
-
-
-def _buscar_raw(pregunta: str) -> str:
-    """Lanza el CodeAgent para obtener resultados de búsqueda en crudo."""
-    agente = CodeAgent(
-        tools=[DuckDuckGoSearchTool()],
-        model=_get_coder_model(),
-        instructions=_SEARCH_INSTRUCTIONS,
-        max_steps=3,
-    )
-    return agente.run(f"Busca información reciente sobre: {pregunta}")
-
-
-# ---------------------------------------------------------------------------
-# Fase 2: resumen en lenguaje natural
-# ---------------------------------------------------------------------------
-
-_RESUMEN_INSTRUCCION = (
-    "Eres analista de fantasy fútbol Champions League. Responde siempre en español. "
-    "A partir de los resultados de búsqueda web que te proporciono, explica en lenguaje natural "
-    "la condición actual del jugador o equipo: forma reciente, lesiones, goles o asistencias "
-    "destacadas, próximos partidos relevantes. Sé conciso (máx. 6 frases) y útil para "
-    "tomar decisiones en UCL Fantasy."
-)
-
-
-def _resumir(resultados_raw: str, pregunta: str) -> str:
-    """Pasa los resultados crudos al LLM de lenguaje natural para resumirlos."""
-    model = _get_nl_model()
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": (
-                        f"{_RESUMEN_INSTRUCCION}\n\n"
-                        f"Pregunta original: {pregunta}\n\n"
-                        f"Resultados de búsqueda:\n{resultados_raw}"
-                    ),
-                }
-            ],
-        }
-    ]
-    respuesta = model(messages)
-    return respuesta.content
-
-
-# ---------------------------------------------------------------------------
-# Función pública
+# Búsqueda y Resumen Directo
 # ---------------------------------------------------------------------------
 
 def buscar(pregunta: str) -> str:
     """
-    Busca información reciente sobre un jugador o equipo y devuelve
-    un resumen en lenguaje natural explicando su condición actual.
+    Busca información reciente directamente y devuelve un resumen.
+    Optimizado para evitar los lentos loops de agentes anidados.
     """
-    resultados_raw = _buscar_raw(pregunta)
-    return _resumir(resultados_raw, pregunta)
+    search_tool = DuckDuckGoSearchTool()
+    
+    try:
+        # 1. Búsqueda directa (sin agente intermedio)
+        print(f"  [Web] Consultando DuckDuckGo: {pregunta}")
+        resultados_raw = search_tool(pregunta)
+        
+        if not resultados_raw or "no results" in str(resultados_raw).lower():
+            return "No se han encontrado noticias recientes en la web."
+            
+        # 2. Resumen con el modelo de lenguaje natural
+        model = _get_nl_model()
+        
+        instruccion = (
+            "Eres analista de fantasy fútbol Champions League. Responde siempre en español. "
+            "A partir de estos resultados de búsqueda, resume la situación del jugador/equipo: "
+            "lesiones, estado de forma, si es titular probable y rendimiento reciente. "
+            "Sé muy conciso (máx. 4 frases)."
+        )
+        
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": f"{instruccion}\n\nResultados:\n{resultados_raw}"}],
+            }
+        ]
+        
+        respuesta = model(messages)
+        return respuesta.content
+    except Exception as e:
+        return f"Error en la búsqueda web: {str(e)}"
 
 
 # ---------------------------------------------------------------------------

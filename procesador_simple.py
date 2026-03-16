@@ -31,7 +31,7 @@ def get_model() -> LiteLLMModel:
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     # Fallback: Ollama local
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen3:14b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 

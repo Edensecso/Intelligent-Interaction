@@ -106,10 +106,21 @@ let activeSlotIndex = null;
 // ---------- INIT ----------
 document.addEventListener('DOMContentLoaded', () => {
     loadPlayers();
+    loadCurrentMarket(); // Cargar mercado guardado si existe
     renderFormationButtons();
     setFormation('433');
     updateSquadInfo();
 });
+
+async function loadCurrentMarket() {
+    try {
+        const res = await fetch('/api/market/current');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success) renderMarketList(data.mercado);
+        }
+    } catch (e) {}
+}
 
 // ---------- CARGAR JUGADORES ----------
 async function loadPlayers() {
@@ -320,7 +331,26 @@ function updateSquadInfo() {
     document.getElementById('btn-save').disabled = filled.length < 11;
 
     const analyzeBtn = document.getElementById('btn-analyze');
-    if (analyzeBtn) analyzeBtn.disabled = filled.length < 11;
+    if (analyzeBtn) {
+        analyzeBtn.disabled = filled.length < 11;
+        analyzeBtn.onclick = toggleChat;
+    }
+
+    // Sincronizar con el servidor en segundo plano
+    syncSquadWithServer(filled);
+}
+
+// ---------- SINCRONIZACION ----------
+async function syncSquadWithServer(filledSquad) {
+    try {
+        await fetch('/api/sync_squad', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ squad: filledSquad }),
+        });
+    } catch (e) {
+        console.error('Error sincronizando plantilla:', e);
+    }
 }
 
 // ---------- GUARDAR (inline estilo FUTBIN) ----------
@@ -356,6 +386,45 @@ async function saveSquad() {
     } else {
         showToast('Error al guardar', true);
     }
+}
+
+// ---------- MERCADO ----------
+async function generateMarket() {
+    showToast('Generando mercado personalizado...');
+    try {
+        const res = await fetch('/api/market/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ squad: squad.filter(Boolean) }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('¡Mercado de 15 jugadores listo!');
+            renderMarketList(data.mercado);
+        } else {
+            showToast('Error al generar mercado: ' + data.error, true);
+        }
+    } catch (e) {
+        showToast('Error de conexión', true);
+    }
+}
+
+function renderMarketList(players) {
+    const list = document.getElementById('market-list');
+    const container = document.getElementById('market-view');
+    if (!list || !container) return;
+
+    if (!players || players.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = players.map(p => `
+        <li style="margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="color: #ffd700;">${p.position}</span> · <strong>${p.name}</strong> (${p.price})
+        </li>
+    `).join('');
 }
 
 // ---------- LIMPIAR ----------
@@ -409,14 +478,87 @@ function closeResults() {
     document.getElementById('results-overlay').classList.remove('active');
 }
 
+// ---------- CHATBOT LOGIC ----------
+function toggleChat() {
+    const input = document.getElementById('chat-input');
+    if (input) input.focus();
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    appendMessage('user', text);
+    input.value = '';
+
+    // Mostrar indicador de carga
+    const typingId = 'typing-' + Date.now();
+    appendMessage('bot', '...', typingId);
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: text,
+                squad: squad.filter(Boolean),
+                presupuesto: parseFloat(document.getElementById('presupuesto-input').value) || 0
+            }),
+        });
+
+        const data = await res.json();
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        if (data.success) {
+            appendMessage('bot', data.response);
+        } else {
+            appendMessage('bot', 'Error: ' + data.error);
+        }
+    } catch (e) {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        appendMessage('bot', 'Error de conexión con el analista.');
+    }
+}
+
+function appendMessage(role, text, id = null) {
+    const container = document.getElementById('chat-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg ${role}-msg`;
+    if (id) msgDiv.id = id;
+    
+    // Mantenemos los saltos de línea y emojis
+    msgDiv.style.whiteSpace = 'pre-wrap';
+    msgDiv.textContent = text;
+    
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+// ---------- EVENT LISTENERS EXTRA ----------
+document.addEventListener('DOMContentLoaded', () => {
+    // ... codigo anterior ...
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+
+    if (chatSend) {
+        chatSend.onclick = sendChatMessage;
+    }
+    if (chatInput) {
+        chatInput.onkeydown = (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        };
+    }
+});
+
 // ---------- ATAJOS TECLADO ----------
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeModal();
+        const chatPanel = document.getElementById('chat-panel');
+        if (chatPanel.classList.contains('active')) toggleChat();
     }
-    // Enter en la barra de guardado
-    if (e.key === 'Enter' && document.activeElement === document.getElementById('save-filename')) {
-        const btn = document.getElementById('btn-save');
-        if (!btn.disabled) saveSquad();
-    }
+    // ... resto del codigo ...
 });

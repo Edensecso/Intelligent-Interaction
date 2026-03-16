@@ -10,7 +10,7 @@ import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from smolagents import tool, CodeAgent, LiteLLMModel
+from smolagents import tool, CodeAgent, ToolCallingAgent, LiteLLMModel
 
 load_dotenv()
 
@@ -35,7 +35,7 @@ def get_agent_model() -> LiteLLMModel:
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_AGENT_MODEL', 'qwen2.5-coder:14b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_AGENT_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
@@ -73,16 +73,20 @@ def generate_team() -> str:
 
 
 @tool
-def generate_market() -> str:
-    """Genera un mercado de 15 jugadores disponibles para fichar,
-    excluyendo los jugadores ya presentes en el equipo."""
-    from procesador_simple import cargar_mercado
-    if not _estado["equipo"]:
-        return "Error: primero carga o genera un equipo."
-    mercado = cargar_mercado(excluidos=_estado["equipo"])
+def load_market(filename: str = "mercado.json") -> str:
+    """Carga el mercado de jugadores desde un archivo JSON generado por el usuario.
+    Usar este tool una vez el usuario ha pulsado el botón de generar mercado.
+
+    Args:
+        filename: Nombre del archivo JSON (por defecto mercado.json).
+    """
+    if not os.path.exists(filename):
+        return "Error: el mercado aún no ha sido generado desde la UI."
+    with open(filename, encoding="utf-8") as f:
+        mercado = json.load(f)
     _estado["mercado"] = mercado
     nombres = [f"  {p['position']} - {p['name']} ({p['price']})" for p in mercado]
-    return f"Mercado generado ({len(mercado)} jugadores):\n" + "\n".join(nombres)
+    return f"Mercado cargado desde {filename} ({len(mercado)} jugadores):\n" + "\n".join(nombres)
 
 
 @tool
@@ -160,31 +164,14 @@ def save_result(analisis_equipo: str, analisis_mercado: str) -> str:
     with open(filename, "w", encoding="utf-8") as f:
         f.write(content)
 
-    # Resumen compacto para el analista (evita saturar el contexto del LLM)
-    def _compact(jugadores, titulo):
-        rows = [titulo]
-        for p in jugadores:
-            rows.append(
-                f"  {p.get('position','?')} {p.get('name','?')} | "
-                f"{p.get('price','?')} | "
-                f"Pts:{p.get('ptos_total',0)} | "
-                f"Forma:{p.get('estado_forma','?')} | "
-                f"Pts/€:{p.get('ptos_por_euro',0)} | "
-                f"Goles:{p.get('goles',0)} | "
-                f"Asist:{p.get('asistencias',0)} | "
-                f"Mins:{p.get('mins_jugados',0)} | "
-                f"Prox:{p.get('prox_partido','?')}"
-            )
-        return "\n".join(rows)
-
-    resumen = (
-        f"[Archivo guardado: {filename}]\n\n"
-        + _compact(_estado["equipo"] or [], "EQUIPO:") + "\n\n"
-        + _compact(_estado["mercado"] or [], "MERCADO:") + "\n\n"
-        + f"ANÁLISIS EQUIPO:\n{analisis_equipo}\n\n"
-        + f"ANÁLISIS MERCADO:\n{analisis_mercado}"
-    )
-    return resumen
+    resumen_json = {
+        "equipo": _estado["equipo"] or [],
+        "mercado": _estado["mercado"] or [],
+        "analisis_equipo": analisis_equipo,
+        "analisis_mercado": analisis_mercado,
+        "archivo_guardado": filename
+    }
+    return json.dumps(resumen_json, ensure_ascii=False)
 
 
 @tool
@@ -202,34 +189,67 @@ def update_players() -> str:
 # Agente
 # ---------------------------------------------------------------------------
 
-INSTRUCTIONS = """Eres el agente ejecutor de UCL Fantasy. Responde siempre en español.
+@tool
+def obtener_analisis_squad() -> str:
+    """Realiza un pre-análisis estadístico completo de la plantilla y el mercado.
+    NO requiere argumentos. Úsala siempre para obtener recomendaciones directas.
+    Devuelve un resumen textual con el equipo completo (todos los jugadores con TODAS sus estadísticas)
+    y candidatos del mercado para comparación opcional.
+    """
+    base_dir = os.path.dirname(__file__)
+    equipo_file = os.path.join(base_dir, "plantilla.json")
+    mercado_file = os.path.join(base_dir, "mercado.json")
+    
+    try:
+        reporte = []
+        
+        # 1. Cargar Equipo
+        if not os.path.exists(equipo_file):
+            return "Error: No hay equipo cargado. Añade jugadores al campo."
+            
+        with open(equipo_file, encoding="utf-8") as f:
+            equipo = json.load(f)
+            
+        reporte.append(f"=== ESTADO DEL EQUIPO ({len(equipo)} jugadores) ===")
+        
+        def get_val(p, key, default=0):
+            try: 
+                val = str(p.get(key, default)).replace('m','').replace('%','').strip()
+                return float(val) if val else float(default)
+            except: return float(default)
 
-Tu objetivo es preparar todos los datos del equipo y mercado para que el analista pueda tomar decisiones.
-Tienes estas herramientas disponibles: load_team, generate_team, generate_market, analyze_team, analyze_market, save_result, update_players.
+        # Mostrar TODO el equipo con TODAS las stats de players.json
+        for p in equipo:
+            stats = []
+            stats.append(f"Pts: {p.get('ptos_total','0')}")
+            stats.append(f"ROI: {p.get('ptos_por_euro','?')}")
+            stats.append(f"Forma: {p.get('estado_forma','?')}")
+            stats.append(f"Goles: {p.get('goles','0')}")
+            stats.append(f"Asist: {p.get('asistencias','0')}")
+            stats.append(f"Recup: {p.get('balones_recuperados','0')}")
+            stats.append(f"Mins: {p.get('mins_jugados','0')}")
+            stats.append(f"Fichado: {p.get('seleccionado','?')}")
+            if p.get('porteria_a_0') is not None and p.get('position') in ['POR', 'DEF']:
+                stats.append(f"CleanSheet: {p.get('porteria_a_0')}")
+            
+            reporte.append(f"[{p['position']}] {p['name']} ({p['price']}) -> " + " | ".join(stats))
 
-Usa load_team() si existe plantilla.json, o generate_team() si no hay equipo guardado.
-Cuando termines, devuelve el contenido completo que retorna save_result, que incluye los datos JSON de todos los jugadores."""
+        # 2. Cargar Mercado (Solo resumen para no sobrecargar context, salvo que pida mejorar)
+        if os.path.exists(mercado_file):
+            with open(mercado_file, encoding="utf-8") as f:
+                mercado = json.load(f)
+            
+            reporte.append("\n=== OPORTUNIDADES DEL MERCADO (Solo si se pide mejorar) ===")
+            mejores = sorted(mercado, key=lambda x: (get_val(x, "estado_forma", 0), get_val(x, "ptos_por_euro", 0)), reverse=True)[:5]
+            for p in mejores:
+                reporte.append(f"[SUGERENCIA] {p['name']} ({p['price']}) - Pts: {p['ptos_total']} | ROI: {p.get('ptos_por_euro','?')}")
+        else:
+            reporte.append("\n[AVISO] No hay mercado generado.")
 
-
-def crear_agente() -> CodeAgent:
-    agente = CodeAgent(
-        tools=[load_team, generate_team, generate_market, analyze_team,
-               analyze_market, save_result],
-        model=get_agent_model(),
-        instructions=INSTRUCTIONS,
-        additional_authorized_imports=["os", "json", "glob"],
-        max_steps=8,
-        executor_kwargs={"timeout_seconds": 3600},
-    )
-    # Atributos requeridos para usarse como managed_agent
-    agente.name = "ejecutor"
-    agente.description = (
-        "Agente ejecutor de UCL Fantasy. Carga el equipo del usuario desde plantilla.json "
-        "(o genera uno aleatorio si no existe), obtiene el mercado de jugadores disponibles, "
-        "analiza ambos con el procesador simple y guarda el resultado en un archivo .txt. "
-        "Devuelve el contenido completo del archivo con equipo, mercado y análisis."
-    )
-    return agente
+        return "\n".join(reporte)
+        
+    except Exception as e:
+        return f"Error en el pre-análisis: {str(e)}"
 
 
 # ---------------------------------------------------------------------------

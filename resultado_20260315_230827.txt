@@ -1,0 +1,58 @@
+=== RESULTADO FANTASY UCL — 15/03/2026 23:08 ===
+
+--- EQUIPO ---
+  POR - G. Vicario | Precio: 5.1m | Pts: 44 | Forma: 3.0 stars | Goles: 0 | Asist: 0 | Mins: 720 | Equipo: TOT | balones_recuperados: 0 | fichados: 5775 | porteria_a_0: 6 | prox_partido: - | ptos_jornada: 5 | ptos_per_md: 5.5 | ptos_por_euro: 8.6 | ptos_potm: 3 | seleccionado: 7 % | tarjetas_amarillas: 1 | tarjetas_rojas: 0
+  DEF - V. Van Dijk | Precio: 6.2m | Pts: 64 | Forma: 4.0 stars | Goles: 2 | Asist: 2 | Mins: 720 | Equipo: LIV | balones_recuperados: 40 | fichados: 13672 | porteria_a_0: 4 | prox_partido: - | ptos_jornada: 15 | ptos_per_md: 8 | ptos_por_euro: 10.3 | ptos_potm: 6 | seleccionado: 34 % | tarjetas_amarillas: 1 | tarjetas_rojas: 0
+  DEF - A. Grimaldo | Precio: 6.2m | Pts: 61 | Forma: 5.0 stars | Goles: 4 | Asist: 1 | Mins: 719 | Equipo: OLY - LEV | balones_recuperados: 46 | fichados: 46680 | porteria_a_0: 3 | prox_partido: OLY (A) | ptos_jornada: 14 | ptos_per_md: 7.6 | ptos_por_euro: 9.8 | ptos_potm: 0 | seleccionado: 15 % | tarjetas_amarillas: 1 | tarjetas_rojas: 0
+  DEF - C. Romero | Precio: 5m | Pts: 59 | Forma: 3.5 stars | Goles: 1 | Asist: 3 | Mins: 523 | Equipo: TOT | balones_recuperados: 38 | fichados: 14068 | porteria_a_0: 5 | prox_partido: - | ptos_jornada: 15 | ptos_per_md: 9.8 | ptos_por_euro: 11.8 | ptos_potm: 3 | seleccionado: 5 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+  DEF - Nuno Mendes | Precio: 6.3m | Pts: 57 | Forma: 4.5 stars | Goles: 2 | Asist: 2 | Mins: 660 | Equipo: MON - PSG | balones_recuperados: 57 | fichados: 27947 | porteria_a_0: 2 | prox_partido: MON (A) | ptos_jornada: 4 | ptos_per_md: 7.1 | ptos_por_euro: 9.1 | ptos_potm: 6 | seleccionado: 50 % | tarjetas_amarillas: 2 | tarjetas_rojas: 0
+  CEN - D. Szoboszlai | Precio: 7m | Pts: 67 | Forma: 5.0 stars | Goles: 4 | Asist: 4 | Mins: 705 | Equipo: LIV | balones_recuperados: 38 | fichados: 15267 | porteria_a_0: 4 | prox_partido: - | ptos_jornada: 9 | ptos_per_md: 8.4 | ptos_por_euro: 9.6 | ptos_potm: 3 | seleccionado: 17 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+  CEN - Vitinha | Precio: 7.3m | Pts: 65 | Forma: 4.5 stars | Goles: 5 | Asist: 1 | Mins: 719 | Equipo: MON - PSG | balones_recuperados: 46 | fichados: 36778 | porteria_a_0: 2 | prox_partido: MON (A) | ptos_jornada: 9 | ptos_per_md: 8.1 | ptos_por_euro: 8.9 | ptos_potm: 3 | seleccionado: 39 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+  CEN - A. Gordon | Precio: 7.1m | Pts: 59 | Forma: 3.5 stars | Goles: 6 | Asist: 2 | Mins: 562 | Equipo: QAR - NEW | balones_recuperados: 9 | fichados: 45783 | porteria_a_0: 3 | prox_partido: QAR (A) | ptos_jornada: 1 | ptos_per_md: 7.4 | ptos_por_euro: 8.3 | ptos_potm: 6 | seleccionado: 10 % | tarjetas_amarillas: 1 | tarjetas_rojas: 0
+  DEL - K. Mbappé | Precio: 11m | Pts: 77 | Forma: 5.0 stars | Goles: 13 | Asist: 0 | Mins: 621 | Equipo: BEN - RMA | balones_recuperados: 1 | fichados: 18859 | porteria_a_0: 0 | prox_partido: BEN (A) | ptos_jornada: 10 | ptos_per_md: 11 | ptos_por_euro: 7 | ptos_potm: 9 | seleccionado: 71 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+  DEL - H. Kane | Precio: 10.8m | Pts: 58 | Forma: 5.0 stars | Goles: 8 | Asist: 0 | Mins: 607 | Equipo: BAY | balones_recuperados: 9 | fichados: 10029 | porteria_a_0: 0 | prox_partido: - | ptos_jornada: 5 | ptos_per_md: 7.3 | ptos_por_euro: 5.4 | ptos_potm: 9 | seleccionado: 41 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+  DEL - M. Rashford | Precio: 7.5m | Pts: 49 | Forma: 4.0 stars | Goles: 5 | Asist: 3 | Mins: 464 | Equipo: BAR | balones_recuperados: 5 | fichados: 4817 | porteria_a_0: 0 | prox_partido: - | ptos_jornada: 6 | ptos_per_md: 6.1 | ptos_por_euro: 6.5 | ptos_potm: 3 | seleccionado: 12 % | tarjetas_amarillas: 0 | tarjetas_rojas: 0
+
+--- MERCADO ---
+  CEN - B. Saka | Precio: 9.5m | Pts: 30 | Forma: 1.0 stars | Goles: 2 | Asist: 2 | Mins: 375 | Equipo: ARS | seleccionado: 3 % | ptos_jornada: 0 | ptos_por_euro: 3.2 | ptos_per_md: 5 | ptos_potm: 0 | balones_recuperados: 11 | porteria_a_0: 2 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 592 | prox_partido: -
+  CEN - H. Çalhanoğlu | Precio: 7.1m | Pts: 25 | Forma: 0.0 stars | Goles: 1 | Asist: 2 | Mins: 337 | Equipo: BOD - INT | seleccionado: 7 % | ptos_jornada: 0 | ptos_por_euro: 3.5 | ptos_per_md: 4.2 | ptos_potm: 0 | balones_recuperados: 17 | porteria_a_0: 2 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 786 | prox_partido: BOD (A)
+  POR - F. Buntić | Precio: 4m | Pts: 0 | Forma: 0.0 stars | Goles: 0 | Asist: 0 | Mins: 0 | Equipo: QAR - NEW | seleccionado: 0 | ptos_jornada: 0 | ptos_por_euro: 0 | ptos_per_md: 0 | ptos_potm: 0 | balones_recuperados: 0 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 34 | prox_partido: NEW (H)
+  CEN - L. Andrade | Precio: 5.2m | Pts: 34 | Forma: 0.0 stars | Goles: 3 | Asist: 1 | Mins: 533 | Equipo: QAR - NEW | seleccionado: 0 | ptos_jornada: 2 | ptos_por_euro: 6.5 | ptos_per_md: 4.3 | ptos_potm: 0 | balones_recuperados: 11 | porteria_a_0: 2 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 174 | prox_partido: NEW (H)
+  DEF - R. James | Precio: 4.9m | Pts: 25 | Forma: 0.5 stars | Goles: 0 | Asist: 2 | Mins: 475 | Equipo: CHE | seleccionado: 3 % | ptos_jornada: 3 | ptos_por_euro: 5.1 | ptos_per_md: 3.6 | ptos_potm: 0 | balones_recuperados: 31 | porteria_a_0: 1 | tarjetas_rojas: 0 | tarjetas_amarillas: 1 | fichados: 779 | prox_partido: -
+  DEF - V. Osuji | Precio: 4m | Pts: 0 | Forma: 0.0 stars | Goles: 0 | Asist: 0 | Mins: 0 | Equipo: BRU - ATM | seleccionado: 0 | ptos_jornada: 0 | ptos_por_euro: 0 | ptos_per_md: 0 | ptos_potm: 0 | balones_recuperados: 0 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 17 | prox_partido: ATM (H)
+  DEF - R. Guerreiro | Precio: 4.9m | Pts: 27 | Forma: 0.5 stars | Goles: 1 | Asist: 0 | Mins: 249 | Equipo: BAY | seleccionado: 1 % | ptos_jornada: 0 | ptos_por_euro: 5.5 | ptos_per_md: 5.4 | ptos_potm: 0 | balones_recuperados: 17 | porteria_a_0: 2 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 5 | prox_partido: -
+  DEF - S. De Vrij | Precio: 4.5m | Pts: 13 | Forma: 1.5 stars | Goles: 0 | Asist: 0 | Mins: 225 | Equipo: BOD - INT | seleccionado: 1 % | ptos_jornada: 0 | ptos_por_euro: 2.9 | ptos_per_md: 4.3 | ptos_potm: 0 | balones_recuperados: 18 | porteria_a_0: 1 | tarjetas_rojas: 0 | tarjetas_amarillas: 1 | fichados: 107 | prox_partido: BOD (A)
+  CEN - J. Willock | Precio: 5m | Pts: 13 | Forma: 1.5 stars | Goles: 1 | Asist: 0 | Mins: 172 | Equipo: QAR - NEW | seleccionado: 0 | ptos_jornada: 8 | ptos_por_euro: 2.6 | ptos_per_md: 2.6 | ptos_potm: 0 | balones_recuperados: 10 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 1 | fichados: 77 | prox_partido: QAR (A)
+  DEF - M. Kerkez | Precio: 4.7m | Pts: 13 | Forma: 2.5 stars | Goles: 0 | Asist: 0 | Mins: 276 | Equipo: LIV | seleccionado: 1 % | ptos_jornada: 0 | ptos_por_euro: 2.8 | ptos_per_md: 2.6 | ptos_potm: 0 | balones_recuperados: 11 | porteria_a_0: 1 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 55 | prox_partido: -
+  POR - Á. Pécsi | Precio: 4m | Pts: 0 | Forma: 0.0 stars | Goles: 0 | Asist: 0 | Mins: 0 | Equipo: LIV | seleccionado: 0 | ptos_jornada: 0 | ptos_por_euro: 0 | ptos_per_md: 0 | ptos_potm: 0 | balones_recuperados: 0 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 24 | prox_partido: -
+  DEL - R. Vermant | Precio: 4.6m | Pts: 17 | Forma: 2.0 stars | Goles: 2 | Asist: 0 | Mins: 289 | Equipo: BRU - ATM | seleccionado: 0 | ptos_jornada: 6 | ptos_por_euro: 3.7 | ptos_per_md: 2.8 | ptos_potm: 0 | balones_recuperados: 4 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 93 | prox_partido: ATM (H)
+  DEF - S. Kolašinac | Precio: 4.4m | Pts: 9 | Forma: 0.0 stars | Goles: 0 | Asist: 0 | Mins: 163 | Equipo: BVB - ATA | seleccionado: 0 | ptos_jornada: 0 | ptos_por_euro: 2.1 | ptos_per_md: 3 | ptos_potm: 0 | balones_recuperados: 17 | porteria_a_0: 0 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 41 | prox_partido: BVB (A)
+  CEN - S. Tonali | Precio: 6.6m | Pts: 34 | Forma: 2.0 stars | Goles: 0 | Asist: 1 | Mins: 630 | Equipo: QAR - NEW | seleccionado: 1 % | ptos_jornada: 4 | ptos_por_euro: 5.2 | ptos_per_md: 4.9 | ptos_potm: 3 | balones_recuperados: 43 | porteria_a_0: 3 | tarjetas_rojas: 0 | tarjetas_amarillas: 1 | fichados: 2942 | prox_partido: QAR (A)
+  DEF - W. Pacho | Precio: 5m | Pts: 45 | Forma: 4.0 stars | Goles: 2 | Asist: 0 | Mins: 720 | Equipo: MON - PSG | seleccionado: 14 % | ptos_jornada: 5 | ptos_por_euro: 9 | ptos_per_md: 5.6 | ptos_potm: 0 | balones_recuperados: 48 | porteria_a_0: 2 | tarjetas_rojas: 0 | tarjetas_amarillas: 0 | fichados: 25479 | prox_partido: MON (A)
+
+--- ANÁLISIS DEL EQUIPO ---
+The provided list contains data for a few football players in their respective teams. Here's a summary of the data:
+
+1. Player: K. Kane
+   - Position: DEL (Defender)
+   - Fichado: 10029
+   - Goles: 8
+   - Mins jugados: 607
+   - Seleccionado: 41% (12%)
+   - Tarjetas: Ninguna (amarillas/rojas)
+
+2. Player: M. Rashford
+   - Position: DEL (Defender)
+   - Fichado: 4817
+   - Goles: 5
+   - Mins jugados: 464
+   - Seleccionado: 12% (0%)
+   - Tarjetas: Ninguna (amarillas/rojas)
+
+3. Team: BAR (Barcelona)
+   - Jornadas jugadas: 6
+
+These details show that K. Kane and M. Rashford are part of the BAR squad, with Kane having a higher selection percentage (12%) and Rashford with none (0%). The team, Barcelona, has played 6 matches in this data set.
+
+--- ANÁLISIS DEL MERCADO ---
+The provided JSON list has only one match, so I don't have data for the selected match, and only one star.

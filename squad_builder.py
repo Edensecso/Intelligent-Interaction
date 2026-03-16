@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session
 import json
 from datetime import datetime
 import os
@@ -6,6 +6,7 @@ import os
 app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
+app.secret_key = 'ucl_fantasy_secret_key' # Para persistir historial de chat
 
 PLAYERS_FILE = os.path.join(os.path.dirname(__file__), 'players.json')
 
@@ -50,6 +51,20 @@ def save_squad():
 
     return jsonify({'success': True, 'path': output_path})
 
+@app.route('/api/sync_squad', methods=['POST'])
+def sync_squad():
+    """Sincronización silenciosa de la plantilla actual para que el Analista la conozca."""
+    data = request.get_json()
+    squad_data = data.get('squad', [])
+    
+    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
+    try:
+        with open(plantilla_path, 'w', encoding='utf-8') as f:
+            json.dump(squad_data, f, ensure_ascii=False, indent=4)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/analizar', methods=['POST'])
 def analizar():
     """Recibe el equipo seleccionado y el presupuesto, lanza el analista y devuelve la recomendación."""
@@ -70,11 +85,72 @@ def analizar():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/formations')
-def get_formations():
-    """Devuelve las formaciones disponibles."""
-    formations = ['541', '532', '451', '442', '433', '352', '343']
-    return jsonify(formations)
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Endpoint para el chatbot interactivo."""
+    data = request.get_json()
+    user_msg = data.get('message', '')
+    squad_data = data.get('squad', [])
+    presupuesto = float(data.get('presupuesto', 0))
+
+    # Inicializar historial si no existe
+    if 'chat_history' not in session:
+        session['chat_history'] = []
+
+    # Guardar plantilla actual (por si el agente necesita leerla)
+    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
+    with open(plantilla_path, 'w', encoding='utf-8') as f:
+        json.dump(squad_data, f, ensure_ascii=False, indent=4)
+
+    try:
+        from analista import chatear
+        # Obtenemos respuesta del agente pasando el historial
+        respuesta, nuevo_historial = chatear(user_msg, session['chat_history'], presupuesto)
+        
+        # Actualizar historial en sesion
+        session['chat_history'] = nuevo_historial
+        
+        return jsonify({'success': True, 'response': str(respuesta)})
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/market/generate', methods=['POST'])
+def generate_market():
+    """Genera un nuevo mercado basado en la plantilla actual (excluyendo jugadores elegidos)."""
+    data = request.get_json()
+    squad_data = data.get('squad', [])
+    
+    try:
+        from procesador_simple import cargar_mercado
+        mercado = cargar_mercado(excluidos=squad_data)
+        
+        # Guardar mercado para que el agente lo lea
+        mercado_path = os.path.join(os.path.dirname(__file__), 'mercado.json')
+        with open(mercado_path, 'w', encoding='utf-8') as f:
+            json.dump(mercado, f, ensure_ascii=False, indent=4)
+            
+        return jsonify({'success': True, 'mercado': mercado})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/market/current')
+def get_current_market():
+    """Devuelve el mercado actualmente guardado en mercado.json."""
+    mercado_path = os.path.join(os.path.dirname(__file__), 'mercado.json')
+    if not os.path.exists(mercado_path):
+        return jsonify({'success': False, 'error': 'No hay mercado generado'}), 404
+    
+    try:
+        with open(mercado_path, 'r', encoding='utf-8') as f:
+            mercado = json.load(f)
+        return jsonify({'success': True, 'mercado': mercado})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     # use_reloader=False evita conflictos con subprocesos del CodeAgent
