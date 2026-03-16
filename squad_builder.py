@@ -131,7 +131,7 @@ def sync_squad():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/analizar', methods=['POST'])
-def analizar():
+def analizar_endpoint():
     """Recibe el equipo seleccionado y el presupuesto, lanza el analista y devuelve la recomendación."""
     data = request.get_json()
     squad_data = data.get('squad', [])
@@ -141,8 +141,8 @@ def analizar():
     persist_current_squad(squad_data)
 
     try:
-        from analista import analizar
-        resultado = analizar(presupuesto)
+        from analista import analizar as analizar_agente
+        resultado = analizar_agente(presupuesto)
         return jsonify({'success': True, 'resultado': str(resultado)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -169,6 +169,12 @@ def chat():
                 squad_data = loaded
         except Exception:
             pass
+
+    if not squad_data:
+        return jsonify({
+            'success': False,
+            'error': 'No hay plantilla cargada todavía. Carga una plantilla o selecciona jugadores antes de chatear.'
+        }), 400
 
     persist_current_squad(squad_data)
 

@@ -159,9 +159,10 @@ def shuffle_mercado(players_file="players.json", excluded_team=None):
         mercado = random.sample(jugadores_disponibles, 15)
     except ValueError:
         print("Error: No hay suficientes jugadores para formar el mercado.")
-        return
+        return None
         
     print_players_table(mercado, "MERCADO (15 Jugadores)")
+    return mercado
 
 
 if __name__ == "__main__":

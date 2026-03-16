@@ -10,7 +10,7 @@ import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from smolagents import tool, CodeAgent, ToolCallingAgent, LiteLLMModel
+from smolagents import tool, CodeAgent, LiteLLMModel
 
 load_dotenv()
 
@@ -107,6 +107,58 @@ def analyze_market() -> str:
     if not _estado["mercado"]:
         return "Error: primero genera el mercado con generate_market."
     return procesar_mercado(_estado["mercado"], get_model())
+
+
+@tool
+def evaluar_plantilla_actual() -> str:
+    """
+    Carga y analiza la plantilla actual. 
+    Usa esta herramienta al inicio para entender el estado del equipo.
+    """
+    if not _estado["equipo"]:
+        res = load_team()  # Intenta cargar plantilla.json por defecto
+        if "Error" in res:
+            return f"No se pudo cargar la plantilla automáticamente: {res}"
+            
+    return analyze_team()
+
+
+@tool
+def evaluar_mercado_fichajes() -> str:
+    """
+    Carga y analiza el mercado de fichajes disponible.
+    Usa esta herramienta para ver qué opciones hay antes de recomendar cambios.
+    """
+    if not _estado["mercado"]:
+        res = load_market()
+        if "Error" in res:
+             # Si falla cargando mercado.json, intentamos generarlo o avisar
+            return f"No se ha encontrado un mercado generado. Pide al usuario que genere el mercado primero."
+
+    return analyze_market()
+
+
+@tool
+def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
+    """
+    Compara la plantilla actual con el mercado y sugiere cambios (venta -> compra).
+    
+    Args:
+        posicion_objetivo: (Opcional) Filtrar por posición ('POR', 'DEF', 'CEN', 'DEL'). 
+                           Si se deja vacío, analiza globalmente.
+    """
+    from procesador_simple import procesar_cambios, get_model
+    
+    # Asegurar datos cargados
+    if not _estado["equipo"]:
+        load_team()
+    if not _estado["mercado"]:
+        load_market()
+        
+    if not _estado["equipo"] or not _estado["mercado"]:
+        return "Error: Se requieren tanto la plantilla como el mercado para recomendar cambios."
+        
+    return procesar_cambios(_estado["equipo"], _estado["mercado"], get_model())
 
 
 @tool
@@ -339,7 +391,16 @@ def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    agente = ToolCallingAgent(
+    AGENT_INSTRUCTIONS = (
+        "Eres un agente especialista en UCL Fantasy (Champions League Fantasy Football). "
+        "SOLO puedes responder preguntas relacionadas con Fantasy UCL: plantillas, jugadores, "
+        "fichajes, ventas, mercado, estadísticas y estado de forma de jugadores de Champions League. "
+        "Si el usuario pregunta algo que NO sea sobre Fantasy UCL, responde EXACTAMENTE: "
+        "'Solo puedo ayudar con consultas de Fantasy UCL (plantilla, mercado, fichajes, ventas y estado de jugadores).' "
+        "Responde siempre en español."
+    )
+
+    agente = CodeAgent(
         tools=[
             evaluar_plantilla_actual,
             evaluar_mercado_fichajes,
@@ -347,16 +408,21 @@ if __name__ == "__main__":
             buscar_noticias_jugador,
             load_team,
             load_market,
+            generate_team,
+            analyze_team,
+            analyze_market,
+            save_result,
         ],
         model=get_agent_model(),
         max_steps=8,
+        instructions=AGENT_INSTRUCTIONS,
     )
 
     print("=== Agente Ejecutor Fantasy UCL ===")
     print("Comandos: analiza mi equipo, actualiza jugadores, (o 'salir')\n")
 
     while True:
-        pregunta = input("T\u00fa: ").strip()
+        pregunta = input("Tú: ").strip()
         if pregunta.lower() in ("salir", "exit", "q"):
             print("¡Hasta luego!")
             break

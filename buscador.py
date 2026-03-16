@@ -37,7 +37,7 @@ def _get_nl_model() -> LiteLLMModel:
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen:7b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:3b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 

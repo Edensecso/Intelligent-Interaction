@@ -31,7 +31,7 @@ def get_model() -> LiteLLMModel:
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     # Fallback: Ollama local
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen:7b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen3:4b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
@@ -40,7 +40,7 @@ def get_model() -> LiteLLMModel:
 # Helpers internos
 # ---------------------------------------------------------------------------
 
-def _llamar_llm(model: LiteLLMModel, instruccion: str, datos: list[dict]) -> str:
+def _llamar_llm(model: LiteLLMModel, instruccion: str, datos: list[dict] | dict) -> str:
     """Envía una petición al LLM y devuelve el texto de respuesta."""
     messages = [
         {
@@ -68,7 +68,8 @@ def procesar_equipo(equipo: list[dict], model: LiteLLMModel) -> str:
     un resumen natural del equipo.
     """
     instruccion = (
-        "Eres analista de fantasy fútbol Champions League. Responde siempre en español. "
+        "IMPORTANTE: Responde ÚNICAMENTE en español. "
+        "Eres analista de fantasy fútbol Champions League. "
         "Describe este equipo de 11 jugadores de forma breve y natural (máx. 5 frases). "
         "Menciona 2-3 jugadores destacados por puntos o forma, y el precio medio aproximado."
     )
@@ -81,12 +82,30 @@ def procesar_mercado(mercado: list[dict], model: LiteLLMModel) -> str:
     las mejores recomendaciones de fichaje.
     """
     instruccion = (
-        "Eres analista de fantasy fútbol Champions League. Responde siempre en español. "
+        "IMPORTANTE: Responde ÚNICAMENTE en español. "
+        "Eres analista de fantasy fútbol Champions League. "
         "De estos jugadores disponibles en el mercado, "
         "recomienda los 3 mejores fichajes de forma breve (máx. 4 frases). "
         "Justifica cada uno en una línea."
     )
     return _llamar_llm(model, instruccion, mercado)
+
+
+def procesar_cambios(equipo: list[dict], mercado: list[dict], model: LiteLLMModel) -> str:
+    """
+    Analiza el equipo y el mercado simultáneamente para sugerir cambios.
+    """
+    datos = {"equipo": equipo, "mercado": mercado}
+    instruccion = (
+        "IMPORTANTE: Responde ÚNICAMENTE en español. "
+        "Eres un analista experto de fantasy fútbol Champions League. "
+        "Analiza mi equipo actual y las opciones disponibles en el mercado. "
+        "Sugiere 2 o 3 cambios concretos (VENDER -> COMPRAR) que mejoren el equipo a corto plazo. "
+        "Justifica brevemente la decisión basada en puntos, forma o valoración."
+    )
+    # _llamar_llm espera una lista de dicts o un objeto serializable
+    # Modificamos _llamar_llm para aceptar cualquier objeto serializable
+    return _llamar_llm(model, instruccion, datos)
 
 
 def cargar_mercado(players_file: str = "players.json", excluidos: list[dict] | None = None) -> list[dict]:
