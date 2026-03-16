@@ -27,9 +27,11 @@ def _get_manager_model() -> LiteLLMModel:
         return LiteLLMModel(model_id="groq/llama-3.3-70b-versatile")
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
+    # Ollama: desactivar thinking mode para que el output sea limpio y parseable
     return LiteLLMModel(
         model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        extra_body={"think": False},
     )
 
 
@@ -149,6 +151,7 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
 
     wants_plantilla = any(k in msg_lower for k in ["anali", "evalua", "plantilla", "equipo", "mi once"])
     wants_cambios   = any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado", "maximo"])
+    wants_forma     = any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta"])
 
     pos = ""
     if "delan" in msg_lower: pos = "DEL"
@@ -160,13 +163,12 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     # PRE-FETCH: recoger datos estructurados ANTES de llamar al LLM
     # ------------------------------------------------------------------
     datos_context = ""
-    jugadores_a_buscar = []  # nombres para que el agente busque noticias
+    jugadores_a_buscar = []
 
     if wants_plantilla or wants_cambios:
         try:
             plantilla_txt = evaluar_plantilla_actual()
             datos_context += f"=== DATOS DE LA PLANTILLA ===\n{plantilla_txt}\n\n"
-            # Estrella del equipo
             m = _re.search(r'Maximo Goleador: ([^\(\n]+)', plantilla_txt)
             if m:
                 jugadores_a_buscar.append(m.group(1).strip())
@@ -177,7 +179,6 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
         try:
             cambios_txt = obtener_recomendaciones_cambio(pos)
             datos_context += f"=== CAMBIOS RECOMENDADOS ===\n{cambios_txt}\n\n"
-            # Añadir jugadores de las operaciones a la lista de búsqueda
             for nombre in _re.findall(r'VENDER: ([^\(\n]+)', cambios_txt):
                 jugadores_a_buscar.append(nombre.strip())
             for nombre in _re.findall(r'FICHAR: ([^\(\n]+)', cambios_txt):
@@ -185,11 +186,17 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
         except Exception as e:
             datos_context += f"[Error al cargar cambios: {e}]\n\n"
 
+    # Para preguntas de forma: extraer el nombre del jugador del mensaje
+    if wants_forma and not jugadores_a_buscar:
+        # Busca nombres propios (palabras con mayúscula) en el mensaje original
+        nombres_msg = _re.findall(r'\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*\b', msg_display)
+        jugadores_a_buscar = [n for n in nombres_msg if len(n) > 3]
+
     # Eliminar duplicados manteniendo orden
     seen = set()
     jugadores_unicos = [j for j in jugadores_a_buscar if not (j in seen or seen.add(j))]
 
-    # Construir lista de búsquedas a realizar (el agente las ejecutará)
+    # Hint de búsquedas para el agente
     busquedas_hint = ""
     if jugadores_unicos:
         calls = "\n".join(
@@ -200,28 +207,53 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
             f"```python\n{calls}\n```\n\n"
         )
 
-    # ------------------------------------------------------------------
-    # Instrucciones del agente: solo buscar noticias + redactar análisis
-    # ------------------------------------------------------------------
-    INSTRUCTIONS = """Eres un Director Técnico experto en Fantasy Football UCL.
-Se te proporcionan datos estructurados del equipo. Tu ÚNICA misión es:
-1. Buscar noticias de los jugadores indicados con estado_forma_jugador_actual().
-2. Redactar un análisis estratégico en español fluido con final_answer().
+    # TAREA dinámica según tipo de pregunta
+    if wants_plantilla and wants_cambios:
+        tarea = (
+            "TAREA: Busca noticias de los jugadores indicados y redacta un análisis estratégico en español que incluya:\n"
+            "- Estado de cada línea (portería, defensa, centrocampo, delantera)\n"
+            "- Qué vender y por qué (nombre, precio, ROI)\n"
+            "- Qué fichar y por qué (nombre, precio, mejora ROI)\n"
+            "- Cálculo: ventas + presupuesto = dinero total disponible vs coste fichajes\n"
+            "- Estado de forma de cada jugador involucrado\n"
+            "- Priorización de los cambios"
+        )
+    elif wants_plantilla:
+        tarea = (
+            "TAREA: Busca noticias del jugador estrella y redacta un análisis del estado del equipo en español:\n"
+            "- Qué líneas rinden bien y cuáles necesitan mejora\n"
+            "- Estado de forma de los jugadores más destacados\n"
+            "- Jugadores con ROI 0 que podrían ser un problema"
+        )
+    elif wants_cambios:
+        tarea = (
+            "TAREA: Busca noticias de los jugadores de venta y fichaje, y redacta el análisis de cambios en español:\n"
+            "- Por qué vender cada jugador (ROI, rendimiento)\n"
+            "- Por qué fichar cada jugador (ROI, precio, mejora)\n"
+            "- Cálculo presupuestario y priorización"
+        )
+    else:
+        tarea = "TAREA: Responde directamente la pregunta anterior en español. Busca noticias si es necesario y responde solo lo que se pregunta."
 
-REGLAS:
-- NUNCA copies tablas de datos en bruto. Interprétalas en texto fluido.
-- NUNCA inventes datos. Usa solo los datos proporcionados y las búsquedas.
-- SIEMPRE usa triple-quote para el texto y asígnalo a una variable antes de llamar final_answer.
+    # ------------------------------------------------------------------
+    # Instrucciones del agente: solo buscar noticias + responder
+    # ------------------------------------------------------------------
+    INSTRUCTIONS = """Eres un asistente de Fantasy Football UCL.
+Responde EXACTAMENTE lo que te pregunta el usuario, ni más ni menos.
+Si preguntan por el estado de un jugador, habla solo de ese jugador.
+Si preguntan por cambios, habla de cambios. No añadas secciones que no se pidan.
 
-EL ÚNICO FORMATO VÁLIDO ES ESTE (con variable y triple-quote):
+Usa estado_forma_jugador_actual() para buscar noticias antes de responder.
+
+FORMATO OBLIGATORIO:
 ```python
-texto = \"\"\"Tu análisis aquí,
-puede ocupar varias líneas,
-sin problema.\"\"\"
+texto = \"\"\"Tu respuesta en español aquí.\"\"\"
 final_answer(texto)
 ```
 
-NUNCA escribas final_answer(...) directamente con el texto dentro sin usar una variable.
+NUNCA escribas el texto fuera de un bloque de código.
+NUNCA uses final_answer("...largo...") — usa siempre la variable `texto`.
+NUNCA inventes datos.
 """
 
     model = _get_manager_model()
@@ -238,23 +270,31 @@ NUNCA escribas final_answer(...) directamente con el texto dentro sin usar una v
         f"PRESUPUESTO: {presupuesto}M\n\n"
         f"{datos_context}"
         f"{busquedas_hint}"
-        "TAREA: Busca las noticias de los jugadores indicados y redacta un análisis "
-        "estratégico completo en español que incluya:\n"
-        "- Estado de cada línea del equipo\n"
-        "- Qué vender y por qué (nombre, precio, ROI)\n"
-        "- Qué fichar y por qué (nombre, precio, mejora ROI)\n"
-        "- Cálculo presupuestario (ventas + saldo = presupuesto total disponible)\n"
-        "- Estado de forma de cada jugador involucrado\n"
-        "- Priorización de los cambios\n\n"
-        "Llama a final_answer() con el análisis redactado."
+        f"{tarea}\n\n"
+        "Llama a final_answer() con la respuesta redactada."
     )
 
     try:
         respuesta_agente = manager.run(prompt)
         respuesta_texto = str(respuesta_agente)
     except Exception as e:
-        respuesta_texto = f"Ocurrió un error al procesar tu solicitud: {str(e)}"
+        error_str = str(e)
         print(f"[Analista-Chat] Error: {e}")
+        # El modelo a veces escribe buen texto pero sin code tags → rescatarlo
+        snippet = _re.search(
+            r'Here is your code snippet:\s*(.*?)(?:Make sure to include|$)',
+            error_str, _re.DOTALL
+        )
+        if snippet and len(snippet.group(1).strip()) > 50:
+            respuesta_texto = snippet.group(1).strip()
+            print("[Analista-Chat] Texto rescatado del error de parsing.")
+        elif "AgentMaxStepsError" in error_str or "max_steps" in error_str.lower():
+            respuesta_texto = (
+                "El análisis tardó demasiado. Intenta con una pregunta más concreta, "
+                "por ejemplo: '¿Qué cambios hacer en el centrocampo?' o '¿Cómo está Mbappé?'"
+            )
+        else:
+            respuesta_texto = f"Ocurrió un error al procesar tu solicitud: {error_str}"
 
     historial.append({"role": "user", "content": msg_display})
     historial.append({"role": "assistant", "content": respuesta_texto})
