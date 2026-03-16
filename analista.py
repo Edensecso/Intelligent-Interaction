@@ -10,10 +10,52 @@ Coordina el pipeline completo como un Manager Agent:
 
 import os
 import re
+import json
+import time
 import unicodedata
 from datetime import datetime
 from dotenv import load_dotenv
 from smolagents import LiteLLMModel, CodeAgent, tool
+
+STATS_FILE = os.path.join(os.path.dirname(__file__), "chat_stats.json")
+
+
+def _guardar_stat(stat: dict):
+    """Añade una entrada de métricas al archivo chat_stats.json."""
+    try:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = {"consultas": []}
+        data["consultas"].append(stat)
+        with open(STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Stats] Error guardando métricas: {e}")
+
+
+def _extraer_tokens(agent) -> tuple[int, int]:
+    """Extrae tokens totales de entrada y salida de agent.memory.steps."""
+    tok_in = tok_out = 0
+    try:
+        steps = agent.memory.steps
+    except AttributeError:
+        return 0, 0
+    for step in steps:
+        usage = getattr(step, "token_usage", None)
+        if usage:
+            tok_in  += getattr(usage, "input_tokens",  0)
+            tok_out += getattr(usage, "output_tokens", 0)
+    return tok_in, tok_out
+
+
+def _num_pasos(agent) -> int:
+    """Número de steps ejecutados por el agente."""
+    try:
+        return len(agent.memory.steps)
+    except AttributeError:
+        return 0
 
 load_dotenv()
 
@@ -320,13 +362,17 @@ MÁNDATORY: Si el usuario pregunta por un jugador específico (como Osimhen/Oshi
         "Llama a final_answer() con la respuesta redactada."
     )
 
+    exito = 0
+    error_parsing = 0
+    t0 = time.time()
+
     try:
         respuesta_agente = manager.run(prompt)
         respuesta_texto = str(respuesta_agente)
+        exito = 1 if len(respuesta_texto) > 30 else 0
     except Exception as e:
         error_str = str(e)
         print(f"[Analista-Chat] Error: {e}")
-        # El modelo a veces escribe buen texto pero sin code tags → rescatarlo
         snippet = _re.search(
             r'Here is your code snippet:\s*(.*?)(?:Make sure to include|$)',
             error_str, _re.DOTALL
@@ -334,6 +380,8 @@ MÁNDATORY: Si el usuario pregunta por un jugador específico (como Osimhen/Oshi
         if snippet and len(snippet.group(1).strip()) > 50:
             respuesta_texto = snippet.group(1).strip()
             print("[Analista-Chat] Texto rescatado del error de parsing.")
+            exito = 1
+            error_parsing = 1
         elif "AgentMaxStepsError" in error_str or "max_steps" in error_str.lower():
             respuesta_texto = (
                 "El análisis tardó demasiado. Intenta con una pregunta más concreta, "
@@ -341,6 +389,27 @@ MÁNDATORY: Si el usuario pregunta por un jugador específico (como Osimhen/Oshi
             )
         else:
             respuesta_texto = f"Ocurrió un error al procesar tu solicitud: {error_str}"
+
+    tiempo_s = round(time.time() - t0, 2)
+    tok_in, tok_out = _extraer_tokens(manager)
+
+    _guardar_stat({
+        "timestamp":      datetime.now().isoformat(),
+        "modelo":         model.model_id,
+        "mensaje":        msg_display[:120],
+        "tipo":           ("plantilla+cambios" if (wants_plantilla and wants_cambios)
+                           else "plantilla" if wants_plantilla
+                           else "cambios"   if wants_cambios
+                           else "forma"),
+        "exito":          exito,
+        "pasos":          _num_pasos(manager),
+        "tiempo_s":       tiempo_s,
+        "tokens_entrada": tok_in,
+        "tokens_salida":  tok_out,
+        "tokens_por_seg": round(tok_out / tiempo_s, 2) if tiempo_s > 0 else 0,
+        "longitud_resp":  len(respuesta_texto),
+        "error_parsing":  error_parsing,
+    })
 
     historial.append({"role": "user", "content": msg_display})
     historial.append({"role": "assistant", "content": respuesta_texto})

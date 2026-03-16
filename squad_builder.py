@@ -271,6 +271,62 @@ def get_current_market():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/stats')
+def get_stats():
+    """Devuelve las métricas acumuladas de las conversaciones del analista."""
+    stats_path = os.path.join(BASE_DIR, 'chat_stats.json')
+    if not os.path.exists(stats_path):
+        return jsonify({'success': True, 'consultas': [], 'resumen': {}})
+
+    try:
+        with open(stats_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        consultas = data.get('consultas', [])
+        n = len(consultas)
+        if n == 0:
+            return jsonify({'success': True, 'consultas': [], 'resumen': {}})
+
+        exitosas = [c for c in consultas if c.get('exito')]
+        resumen = {
+            'total_consultas':    n,
+            'tasa_exito_pct':     round(len(exitosas) / n * 100, 1),
+            'pasos_medio':        round(sum(c.get('pasos', 0) for c in consultas) / n, 2),
+            'tiempo_medio_s':     round(sum(c.get('tiempo_s', 0) for c in consultas) / n, 1),
+            'tokens_salida_total':sum(c.get('tokens_salida', 0) for c in consultas),
+            'tokens_por_seg_medio': round(
+                sum(c.get('tokens_por_seg', 0) for c in consultas if c.get('tokens_por_seg', 0) > 0)
+                / max(1, sum(1 for c in consultas if c.get('tokens_por_seg', 0) > 0)), 1
+            ),
+            'tasa_error_parsing_pct': round(
+                sum(1 for c in consultas if c.get('error_parsing')) / n * 100, 1
+            ),
+            'por_tipo': {},
+        }
+        for tipo in ('forma', 'plantilla', 'cambios', 'plantilla+cambios'):
+            sub = [c for c in consultas if c.get('tipo') == tipo]
+            if sub:
+                resumen['por_tipo'][tipo] = {
+                    'n':           len(sub),
+                    'exito_pct':   round(sum(c.get('exito', 0) for c in sub) / len(sub) * 100, 1),
+                    'pasos_medio': round(sum(c.get('pasos', 0) for c in sub) / len(sub), 2),
+                }
+        return jsonify({'success': True, 'consultas': consultas[-50:], 'resumen': resumen})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/stats/reset', methods=['POST'])
+def reset_stats():
+    """Borra el historial de métricas."""
+    stats_path = os.path.join(BASE_DIR, 'chat_stats.json')
+    try:
+        with open(stats_path, 'w', encoding='utf-8') as f:
+            json.dump({'consultas': []}, f)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # use_reloader=False evita conflictos con subprocesos del CodeAgent
     app.run(debug=True, port=5001, use_reloader=False)

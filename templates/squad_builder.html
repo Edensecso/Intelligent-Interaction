@@ -139,6 +139,9 @@
                 <button class="btn-clear" onclick="clearSquad()">
                     Limpiar Equipo
                 </button>
+                <button class="btn-clear" onclick="openStats()" style="border-color: #a78bfa; color: #a78bfa; margin-top: 8px;">
+                    📊 Estadísticas IA
+                </button>
             </div>
 
         </aside>
@@ -204,6 +207,103 @@
         </div>
     </div>
 
+    <!-- ========== MODAL ESTADÍSTICAS IA ========== -->
+    <div class="modal-overlay" id="stats-overlay" onclick="if(event.target===this) closeStats()">
+        <div class="modal results-modal" style="max-width:680px;">
+            <div class="modal-header">
+                <h2>📊 Estadísticas del <span>Analista IA</span></h2>
+                <button class="modal-close" onclick="closeStats()">X</button>
+            </div>
+            <div class="results-content" id="stats-content" style="font-size:0.88rem;"></div>
+            <div style="padding:12px 20px; display:flex; gap:10px; border-top:1px solid rgba(77,160,255,0.15);">
+                <button class="btn-clear" onclick="openStats()" style="border-color:#4db8ff;color:#4db8ff;">↺ Actualizar</button>
+                <button class="btn-clear" onclick="resetStats()" style="border-color:#ff4d4d;color:#ff4d4d;">🗑 Borrar historial</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/app.js"></script>
+    <script>
+    function openStats() {
+        document.getElementById('stats-overlay').classList.add('active');
+        const box = document.getElementById('stats-content');
+        box.innerHTML = '<p style="color:#8899bb;padding:16px;">Cargando estadísticas…</p>';
+        fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) { box.innerHTML = `<p style="color:#f87171;">Error: ${data.error}</p>`; return; }
+                const r = data.resumen;
+                if (!r || r.total_consultas === 0) {
+                    box.innerHTML = '<p style="color:#8899bb;padding:16px;">Aún no hay consultas registradas. Usa el chat para empezar.</p>';
+                    return;
+                }
+                let html = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px;">
+                    <div class="stat-card"><span class="stat-label">Total consultas</span><span class="stat-val">${r.total_consultas}</span></div>
+                    <div class="stat-card"><span class="stat-label">Tasa de éxito</span><span class="stat-val" style="color:#4ade80;">${r.tasa_exito_pct}%</span></div>
+                    <div class="stat-card"><span class="stat-label">Pasos medios</span><span class="stat-val">${r.pasos_medio}</span></div>
+                    <div class="stat-card"><span class="stat-label">Tiempo medio</span><span class="stat-val">${r.tiempo_medio_s}s</span></div>
+                    <div class="stat-card"><span class="stat-label">Tokens salida (total)</span><span class="stat-val">${r.tokens_salida_total}</span></div>
+                    <div class="stat-card"><span class="stat-label">Tokens/seg</span><span class="stat-val">${r.tokens_por_seg_medio}</span></div>
+                    <div class="stat-card" style="grid-column:span 2;"><span class="stat-label">Tasa error parsing</span><span class="stat-val" style="color:${r.tasa_error_parsing_pct>30?'#f87171':'#facc15'};">${r.tasa_error_parsing_pct}%</span></div>
+                </div>`;
+                if (r.por_tipo && Object.keys(r.por_tipo).length) {
+                    html += `<div style="padding:0 16px 8px;"><h4 style="color:#4db8ff;margin-bottom:8px;">Por tipo de consulta</h4><table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+                    <tr style="color:#8899bb;"><th style="text-align:left;padding:4px 8px;">Tipo</th><th>N</th><th>Éxito</th><th>Pasos medios</th></tr>`;
+                    for (const [tipo, d] of Object.entries(r.por_tipo)) {
+                        html += `<tr style="border-top:1px solid rgba(77,160,255,0.1);">
+                            <td style="padding:5px 8px;">${tipo}</td>
+                            <td style="text-align:center;">${d.n}</td>
+                            <td style="text-align:center;color:${d.exito_pct>=70?'#4ade80':'#f87171'};">${d.exito_pct}%</td>
+                            <td style="text-align:center;">${d.pasos_medio}</td></tr>`;
+                    }
+                    html += `</table></div>`;
+                }
+                // Últimas consultas
+                if (data.consultas && data.consultas.length) {
+                    const ultimas = data.consultas.slice(-8).reverse();
+                    html += `<div style="padding:8px 16px 16px;"><h4 style="color:#4db8ff;margin-bottom:8px;">Últimas consultas</h4>`;
+                    for (const c of ultimas) {
+                        const ok = c.exito ? '✓' : '✗';
+                        const col = c.exito ? '#4ade80' : '#f87171';
+                        const ts = c.timestamp ? c.timestamp.slice(11,19) : '';
+                        html += `<div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(77,160,255,0.08);font-size:0.8rem;">
+                            <span style="color:${col};width:14px;">${ok}</span>
+                            <span style="color:#8899bb;width:60px;">${ts}</span>
+                            <span style="color:#c0d0e8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.mensaje}</span>
+                            <span style="color:#8899bb;white-space:nowrap;">${c.pasos}p · ${c.tiempo_s}s</span>
+                        </div>`;
+                    }
+                    html += `</div>`;
+                }
+                box.innerHTML = html;
+            })
+            .catch(e => { box.innerHTML = `<p style="color:#f87171;">Error de red: ${e}</p>`; });
+    }
+
+    function closeStats() {
+        document.getElementById('stats-overlay').classList.remove('active');
+    }
+
+    function resetStats() {
+        if (!confirm('¿Borrar todo el historial de estadísticas?')) return;
+        fetch('/api/stats/reset', {method:'POST'})
+            .then(r => r.json())
+            .then(() => openStats());
+    }
+    </script>
+    <style>
+    .stat-card {
+        background: rgba(10,20,50,0.6);
+        border: 1px solid rgba(77,160,255,0.15);
+        border-radius: 8px;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .stat-label { color: #8899bb; font-size: 0.78rem; }
+    .stat-val   { color: #c0d0e8; font-size: 1.2rem; font-weight: 600; }
+    </style>
 </body>
 </html>
