@@ -15,7 +15,7 @@ import time
 import unicodedata
 from datetime import datetime
 from dotenv import load_dotenv
-from smolagents import LiteLLMModel, CodeAgent, tool
+from smolagents import LiteLLMModel, CodeAgent, ToolCallingAgent, tool
 
 STATS_FILE = os.path.join(os.path.dirname(__file__), "chat_stats.json")
 
@@ -73,7 +73,6 @@ def _get_manager_model() -> LiteLLMModel:
     return LiteLLMModel(
         model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        extra_body={"think": False},
     )
 
 
@@ -145,11 +144,10 @@ REGLAS DE ORO:
     except ImportError as e:
         return f"Error crítico de importación de herramientas: {str(e)}. Verifica agent.py."
 
-    manager = CodeAgent(
+    manager = ToolCallingAgent(
         tools=tools_list,
         model=model,
-        additional_authorized_imports=["json", "datetime"], # Permite imports comunes en el código generado
-        max_steps=12, # Un poco más de margen
+        max_steps=12,
     )
     
     print(f"\n[Analista] Iniciando orquestador modular con presupuesto {presupuesto}...")
@@ -280,30 +278,27 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     # TAREA dinámica según tipo de pregunta
     if wants_plantilla and wants_cambios:
         tarea = (
-            "TAREA: Busca noticias de los jugadores indicados y redacta un análisis estratégico en español que incluya:\n"
-            "- Estado de cada línea (portería, defensa, centrocampo, delantera)\n"
-            "- Qué vender y por qué (nombre, precio, ROI)\n"
-            "- Qué fichar y por qué (nombre, precio, mejora ROI)\n"
-            "- Cálculo: ventas + presupuesto = dinero total disponible vs coste fichajes\n"
-            "- Estado de forma de cada jugador involucrado\n"
-            "- Priorización de los cambios"
+            "TAREA: Realiza un INFORME ESTRATÉGICO INTEGRAL en español:\n"
+            "1. ANÁLISIS POR LÍNEAS: Evalúa POR, DEF, CEN y DEL basándote en los puntos medios y ROI.\n"
+            "2. DESGLOSE DE LA PLANTILLA: Menciona brevemente a los 11 jugadores y su rendimiento actual.\n"
+            "3. RECOMENDACIONES TÉCNICAS: Detalla qué vender y qué fichar (usa los pares pre-calculados).\n"
+            "4. ESTADO DE FORMA: Resume las noticias de los jugadores clave.\n"
+            "5. CIERRE: Balance final de presupuesto y potencial de puntos."
         )
     elif wants_mercado and not wants_cambios:
          tarea = (
             "TAREA: Redacta una OPINIÓN PROFESIONAL sobre el MERCADO actual en español.\n"
-            "- Menciona los mejores jugadores disponibles según los datos pre-cargados.\n"
-            "- Justifica por qué son buenas opciones (ROI, puntos, precio).\n"
-            "- No hables de cambios específicos de mi plantilla a menos que se te pida."
+            "- Identifica chollos (ROI alto) y jugadores de élite.\n"
+            "- Justifica por qué son buenas inversiones.\n"
+            "- No hables de mi plantilla a menos que sea para comparar valor."
         )
     elif wants_pairs:
         tipo = "UN SOLO FICHAJE" if wants_single else "QUIÉN POR QUIÉN"
         tarea = (
-            f"TAREA: Responde a la petición de '{tipo}' en español.\n"
-            "- El usuario quiere que elijas el mejor movimiento posible (o uno solo si lo pide).\n"
-            "- Usa EXCLUSIVAMENTE los pares VENDER -> FICHAR pre-calculados arriba.\n"
-            "- NO INVENTES JUGADORES (No Neymar, No Di Maria, No Pogba).\n"
-            "- Si el usuario pide UNO SOLO, elige el que tenga mayor IMPACTO (+ pts/M) o la mejor nota.\n"
-            "- DEBES llamar a estado_forma_jugador_actual() para verificar si el jugador a fichar o vender tiene noticias de última hora."
+            f"TAREA: Selecciona el mejor movimiento de '{tipo}' en español.\n"
+            "- Usa los pares VENDER -> FICHAR pre-calculados.\n"
+            "- Justifica financieramente (ahorro vs coste) y por ROI.\n"
+            "- Llama a estado_forma_jugador_actual() para confirmar disponibilidad."
         )
     elif wants_forma or "informacion" in msg_lower or "noticia" in msg_lower:
         tarea = (
@@ -313,10 +308,11 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
         )
     elif wants_plantilla:
         tarea = (
-            "TAREA: Busca noticias del jugador estrella y redacta un análisis del estado del equipo en español:\n"
-            "- Qué líneas rinden bien y cuáles necesitan mejora\n"
-            "- Estado de forma de los jugadores más destacados\n"
-            "- Jugadores con ROI 0 que podrían ser un problema"
+            "TAREA: Genera un INFORME COMPLETO DE LA PLANTILLA en español:\n"
+            "1. RESUMEN GLOBAL: Cómo rinde el equipo en general.\n"
+            "2. ANÁLISIS DE LÍNEAS (POR, DEF, CEN, DEL): Comenta el nivel de cada zona.\n"
+            "3. RENDIMIENTO INDIVIDUAL: Menciona a los 11 jugadores, destacando los mejores ROI y los 'puntos muertos' (ROI 0).\n"
+            "4. ACTUALIDAD: Estado de los jugadores estrella según noticias."
         )
     elif wants_cambios:
         tarea = (
@@ -331,25 +327,23 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     # ------------------------------------------------------------------
     # Instrucciones del agente: solo buscar noticias + responder
     # ------------------------------------------------------------------
-    INSTRUCTIONS = """Eres un asistente experto de Fantasy Football UCL.
-Responde EXACTAMENTE lo que te pregunta el usuario, ni más ni menos.
-REGLA ANTI-ALUCINACIÓN:
-1. SIEMPRE usa estado_forma_jugador_actual() para confirmar datos de jugadores desconocidos.
-2. NUNCA inventes posiciones (un defensa no es portero).
-3. NUNCA inventes equipos o habilidades extrañas.
-4. Si no tienes datos en el contexto ni en el buscador, di simplemente que no tienes esa información.
+    INSTRUCTIONS = """Eres un experto analista técnico de Fantasy Football UCL.
+Tu estilo es profesional, directo y basado en datos.
 
-Al finalizar tu análisis, debes llamar a final_answer() pasando un único argumento que sea tu respuesta redactada COMPLETAMENTE en español.
-NO utilices textos de ejemplo como 'Tu respuesta aquí'. Escribe contenido real y útil basado en los datos.
-MÁNDATORY: Si el usuario pregunta por un jugador específico (como Osimhen/Oshimen), DEBES llamar a estado_forma_jugador_actual() antes de responder.
+REGLAS DE ORO:
+1. INFORME COMPLETO: Cuando el usuario pide un análisis de equipo, DEBES comentar las 4 líneas (POR, DEF, CEN, DEL) y mencionar a los jugadores clave. NO te limites a una sola estrella.
+2. DATOS REALES: Usa los 'DATOS DE LA PLANTILLA' proporcionados en el contexto. No inventes puntos ni precios.
+3. ANTI-ALUCINACIÓN: Si un jugador no está en los datos ni en la búsqueda, dilo. No inventes que está 'en buena forma' si no tienes la noticia.
+4. HERRAMIENTAS: Para noticias de actualidad, llama a estado_forma_jugador_actual().
+
+MÁNDATORY: Si el usuario pide un 'informe completo', estructura tu respuesta con encabezados y analiza a los 11 jugadores.
 """
 
     model = _get_manager_model()
-    manager = CodeAgent(
+    manager = ToolCallingAgent(
         tools=[estado_forma_jugador_actual],
         model=model,
         instructions=INSTRUCTIONS,
-        additional_authorized_imports=["re"],
         max_steps=10,
     )
 

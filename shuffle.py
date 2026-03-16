@@ -101,9 +101,9 @@ def print_players_table(team, title):
             equipo = team_match.strip()
             
         if prox_partido and prox_partido != "-":
-            cajita_partido = f"[{equipo} 🆚 {prox_partido}]"
+            cajita_partido = f"[{equipo} vs {prox_partido}]"
         else:
-            cajita_partido = f"[{equipo} 🆚 Sin part.]"
+            cajita_partido = f"[{equipo} vs Sin part.]"
             
         # Acortar cajita si es muy larga
         if len(cajita_partido) > 16:

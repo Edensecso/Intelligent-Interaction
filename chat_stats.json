@@ -1,0 +1,46 @@
+{
+  "consultas": [
+    {
+      "timestamp": "2026-03-16T23:30:35.340453",
+      "modelo": "ollama/qwen2.5-coder:7b",
+      "mensaje": "opina de mi plantilla",
+      "tipo": "plantilla",
+      "exito": 1,
+      "pasos": 2,
+      "tiempo_s": 50.98,
+      "tokens_entrada": 2093,
+      "tokens_salida": 824,
+      "tokens_por_seg": 16.16,
+      "longitud_resp": 1966,
+      "error_parsing": 0
+    },
+    {
+      "timestamp": "2026-03-16T23:32:37.299422",
+      "modelo": "ollama/qwen2.5-coder:7b",
+      "mensaje": "opina del mercado",
+      "tipo": "forma",
+      "exito": 1,
+      "pasos": 2,
+      "tiempo_s": 24.86,
+      "tokens_entrada": 3750,
+      "tokens_salida": 193,
+      "tokens_por_seg": 7.76,
+      "longitud_resp": 681,
+      "error_parsing": 0
+    },
+    {
+      "timestamp": "2026-03-16T23:33:30.367712",
+      "modelo": "ollama/qwen2.5-coder:7b",
+      "mensaje": "recomiendame un fichaje",
+      "tipo": "cambios",
+      "exito": 1,
+      "pasos": 2,
+      "tiempo_s": 11.91,
+      "tokens_entrada": 2541,
+      "tokens_salida": 138,
+      "tokens_por_seg": 11.59,
+      "longitud_resp": 338,
+      "error_parsing": 0
+    }
+  ]
+}
