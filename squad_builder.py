@@ -104,11 +104,11 @@ def chat():
 
     try:
         from analista import chatear
-        # Obtenemos respuesta del agente pasando el historial
-        respuesta, nuevo_historial = chatear(user_msg, session['chat_history'], presupuesto)
+        # Enviamos historial vacío para que no tenga "memoria" de errores pasados
+        respuesta, _ = chatear(user_msg, [], presupuesto)
         
-        # Actualizar historial en sesion
-        session['chat_history'] = nuevo_historial
+        # Ya no guardamos el historial en la sesión
+        session['chat_history'] = []
         
         return jsonify({'success': True, 'response': str(respuesta)})
     except Exception as e:

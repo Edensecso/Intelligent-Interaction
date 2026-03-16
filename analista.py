@@ -68,28 +68,22 @@ def analizar(presupuesto: float) -> str:
     Args:
         presupuesto: Dinero disponible del usuario en millones (sin contar ventas).
     """
-    from agent import obtener_analisis_squad
+    from agent import generar_informe_detallado, buscar_noticias_jugador
+    from smolagents import ToolCallingAgent
     
-    INSTRUCTIONS = f"""Eres el Analista Orquestador de un equipo de UCL Fantasy. 
-Tu objetivo es dar una recomendación final de fichajes y ventas con las herramientas que tienes.
+    INSTRUCTIONS = f"""Eres el Analista Orquestador de un equipo de UCL Fantasy. Tu misión es dar recomendaciones basadas 100% en DATOS.
 
-PRESUPUESTO DISPONIBLE INICIAL: {presupuesto}M€ (tus ventas te darán más dinero para fichar).
-
-Pasos obligatorios a seguir:
-1. SIEMPRE RESPONDE EN ESPAÑOL. NUNCA USES INGLÉS.
-2. EJECUTA 'obtener_analisis_squad()' UNA SOLA VEZ.
-3. Si el usuario dice "opina de mi equipo", realiza un análisis EXHAUSTIVO de los 11 jugadores usando TODAS las estadísticas proporcionadas (goles, asistencias, recuperaciones, ROI).
-4. IMPORTANTE: En la opinión del equipo, NO hables del mercado ni sugieras fichajes. Céntrate solo en los 11 actuales.
-5. Usa 'buscar_noticias_jugadores' si necesitas confirmar el estado de algún jugador clave.
-6. GENERA el veredicto en español con tono premium.
-
-REGLA DE ORO: Si en el historial ves que antes pedías rutas de archivos, IGNÓRALO. Ahora tienes herramientas directas que no necesitan rutas.
+REGLAS DE ORO:
+1. SIEMPRE RESPONDE EN ESPAÑOL.
+2. EJECUTA 'generar_informe_detallado()' DE INMEDIATO para obtener los datos.
+3. Genera un análisis EXHAUSTIVO basado en Goles, Asistencias, Recuperaciones y ROI.
+4. BASA TU VEREDICTO EN DATOS, no seas genérico. NO PIDAS ARCHIVOS.
 """
 
     model = _get_manager_model()
     
     manager = CodeAgent(
-        tools=[buscar_noticias_jugadores, obtener_analisis_squad],
+        tools=[buscar_noticias_jugadores, obtener_analisis_squad, buscar_noticias_jugador],
         model=model,
         instructions=INSTRUCTIONS,
         additional_authorized_imports=["json"],
@@ -104,47 +98,40 @@ REGLA DE ORO: Si en el historial ves que antes pedías rutas de archivos, IGNÓR
 def chatear(mensaje: str, historial: list, presupuesto: float) -> tuple[str, list]:
     """
     Versión interactiva del analista para modo Chatbot.
-    Mantiene el estado de la conversación.
+    Cada llamada es "fresca" sin memoria persistente para evitar errores.
     """
-    from agent import obtener_analisis_squad
+    from agent import buscar_noticias_jugador, generar_informe_detallado
+    from smolagents import ToolCallingAgent
     
-    INSTRUCTIONS = f"""Eres el Analista Experto de UCL Fantasy en modo Chatbot.
-Tu objetivo es ayudar al usuario a mejorar su equipo de forma interactiva.
+    INSTRUCTIONS = f"""Eres el Analista Experto de UCL Fantasy. Tu misión es dar opiniones TÉCNICAS y ESTADÍSTICAS basadas en DATOS.
 
-REGLAS:
-1. SIEMPRE RESPONDE EN ESPAÑOL. ES OBLIGATORIO.
-2. Si el usuario pide opinión o dice "opina de mi equipo", pulsa 'obtener_analisis_squad()' UNA VEZ y genera un INFORME EXHAUSTIVO de los 11 jugadores.
-3. Para CADA JUGADOR, debes dar un veredicto estadístico usando este formato (o similar):
-   - [Nombre] ([Posición]): [Goles] G, [Asist] A, [Recuperaciones] R, [Puntos] Pts, [ROI] ROI.
-   - Breve análisis técnico: Ej: "Indispensable por su alta recuperación de balones" o "Venta recomendada por bajo rendimiento/minuto".
-4. Usa los Balones Recuperados como métrica CLAVE para Defensas y Mediocentros, ya que puntúan mucho en Fantasy.
-5. En la opinión de equipo, NO hables del mercado ni sugieras fichajes. Céntrate en exprimir el rendimiento de lo que ya tienes.
-6. Responde con estilo premium, usando emojis de fútbol y Champions.
+REGLAS DE ORO:
+1. SIEMPRE RESPONDE EN ESPAÑOL. Es innegociable.
+2. NO PIDAS ARCHIVOS NI RUTAS. Ya tienes las herramientas para leer 'plantilla.json' automáticamente.
+3. EJECUTA 'generar_informe_detallado()' DE INMEDIATO para obtener los datos.
+4. BASA TU OPINIÓN EN: Puntos, Precio, ROI, Goles (G), Asistencias (A) y Recuperaciones (R).
+5. FORMATO DE RESPUESTA OBLIGATORIO:
+   - 📋 ANÁLISIS INDIVIDUAL (Lista los 11 jugadores): 
+     * [Nombre]: [Price]M | [Pts] Pts | G:[G] A:[A] R:[R]. -> Veredicto estadístico claro.
+   - 🏆 CONCLUSIÓN TÉCNICA
+   - ⚠️ RECOMENDACIONES CLAVE
+6. NO des explicaciones previas. Solo ejecuta la herramienta y entrega el informe estadístico.
 """
 
     model = _get_manager_model()
     
-    manager = CodeAgent(
-        tools=[buscar_noticias_jugadores, obtener_analisis_squad],
+    manager = ToolCallingAgent(
+        tools=[generar_informe_detallado, buscar_noticias_jugador],
         model=model,
         instructions=INSTRUCTIONS,
-        additional_authorized_imports=["json"],
-        max_steps=10,
+        max_steps=5,
     )
     
-    prompt_final = f"""HISTORIAL DE CONVERSACIÓN (Solo para contexto):
-{chr(10).join([f"- {m['role']}: {m['content']}" for m in historial])}
+    prompt_final = f"""[TRANSACCIÓN ÚNICA - SIN MEMORIA]
+PRESUPUESTO ACTUAL: {presupuesto}M
+MENSAJE DEL USUARIO: {mensaje}
 
----
-MENSAJE ACTUAL DEL USUARIO: {mensaje}
-
-INSTRUCCIONES CRÍTICAS (SÍGUELAS A RAJATABLA):
-1. ERES UN ANALISTA FANTASY EXPERTO. Tu misión es analizar a los 11 jugadores.
-2. EJECUTA 'obtener_analisis_squad()' UNA SOLA VEZ.
-3. SI YA HAS EJECUTADO LA HERRAMIENTA Y TIENES LOS DATOS, NO LA VUELVAS A LLAMAR. Pasa directamente al paso 4.
-4. Genera un INFORME EXHAUSTIVO en ESPAÑOL comparando a los 11 jugadores. Di quién es el mejor (por ROI/Goles/Recuperaciones) y quién el peor.
-5. Usa la función 'final_answer' para entregar el informe. No uses print() para tu respuesta final.
-6. TODO DEBE SER EN ESPAÑOL.
+Instrucción final: Ejecuta 'generar_informe_detallado' y genera el informe estadístico exhaustivo solicitado.
 """
     
     resultado = manager.run(prompt_final)
