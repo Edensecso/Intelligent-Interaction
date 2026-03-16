@@ -113,10 +113,13 @@ Tu objetivo es ayudar al usuario a mejorar su equipo de forma interactiva.
 
 REGLAS:
 1. SIEMPRE RESPONDE EN ESPAÑOL. ES OBLIGATORIO.
-2. Si el usuario pide opinión o dice "opina de mi equipo", pulsa 'obtener_analisis_squad()' UNA VEZ y haz un análisis profundo de CADA UNO de los 11 jugadores (usa sus goles, asistencias, minutos, etc.).
-3. En la opinión de equipo, NO hables del mercado ni sugieras fichajes. Solo analiza lo que hay en el campo.
-4. Solo menciona el mercado si el usuario te pregunta específicamente cómo mejorar o qué fichar.
-5. Responde con estilo premium, usando emojis de fútbol y Champions.
+2. Si el usuario pide opinión o dice "opina de mi equipo", pulsa 'obtener_analisis_squad()' UNA VEZ y genera un INFORME EXHAUSTIVO de los 11 jugadores.
+3. Para CADA JUGADOR, debes dar un veredicto estadístico usando este formato (o similar):
+   - [Nombre] ([Posición]): [Goles] G, [Asist] A, [Recuperaciones] R, [Puntos] Pts, [ROI] ROI.
+   - Breve análisis técnico: Ej: "Indispensable por su alta recuperación de balones" o "Venta recomendada por bajo rendimiento/minuto".
+4. Usa los Balones Recuperados como métrica CLAVE para Defensas y Mediocentros, ya que puntúan mucho en Fantasy.
+5. En la opinión de equipo, NO hables del mercado ni sugieras fichajes. Céntrate en exprimir el rendimiento de lo que ya tienes.
+6. Responde con estilo premium, usando emojis de fútbol y Champions.
 """
 
     model = _get_manager_model()
@@ -129,19 +132,19 @@ REGLAS:
         max_steps=10,
     )
     
-    # Construimos el prompt final poniendo las reglas DESPUÉS del historial para darles prioridad.
     prompt_final = f"""HISTORIAL DE CONVERSACIÓN (Solo para contexto):
 {chr(10).join([f"- {m['role']}: {m['content']}" for m in historial])}
 
 ---
 MENSAJE ACTUAL DEL USUARIO: {mensaje}
 
-INSTRUCCIONES CRÍTICAS PARA ESTE PASO:
-1. SIEMPRE RESPONDE EN ESPAÑOL.
-2. NO PIDAS RUTAS DE ARCHIVOS. Tienes la herramienta 'obtener_analisis_squad()'.
-3. Si el usuario dice "opina de mi equipo", usa 'obtener_analisis_squad()' y analiza a los 11 jugadores.
-4. IGNORA si en el historial de arriba pedías rutas; eso fue un error. Usa tus tools ahora.
-5. Usa 'final_answer' para dar tu respuesta final estructurada.
+INSTRUCCIONES CRÍTICAS (SÍGUELAS A RAJATABLA):
+1. ERES UN ANALISTA FANTASY EXPERTO. Tu misión es analizar a los 11 jugadores.
+2. EJECUTA 'obtener_analisis_squad()' UNA SOLA VEZ.
+3. SI YA HAS EJECUTADO LA HERRAMIENTA Y TIENES LOS DATOS, NO LA VUELVAS A LLAMAR. Pasa directamente al paso 4.
+4. Genera un INFORME EXHAUSTIVO en ESPAÑOL comparando a los 11 jugadores. Di quién es el mejor (por ROI/Goles/Recuperaciones) y quién el peor.
+5. Usa la función 'final_answer' para entregar el informe. No uses print() para tu respuesta final.
+6. TODO DEBE SER EN ESPAÑOL.
 """
     
     resultado = manager.run(prompt_final)

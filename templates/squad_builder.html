@@ -102,8 +102,14 @@
             <!-- Acciones -->
             <div class="sidebar-section">
                 <h3>Acciones</h3>
+                <button class="btn-clear" id="btn-refresh-stats" onclick="refreshSquadStats()" style="border-color: #ffd700; color: #ffd700; margin-bottom: 8px;" title="Actualiza datos de tu equipo actual desde el archivo local">
+                    Actualizar Estadísticas
+                </button>
                 <button class="btn-clear" onclick="generateMarket()" style="border-color: #4db8ff; color: #4db8ff; margin-bottom: 8px;">
                     Generar Mercado
+                </button>
+                <button class="btn-clear" id="btn-full-scrape" onclick="triggerScraping()" style="border-color: #ff4d4d; color: #ff4d4d; margin-bottom: 8px; font-size: 0.8em;" title="Descarga datos frescos de la UEFA (Lento)">
+                    Update UEFA (Scraping)
                 </button>
                 <div id="market-view" class="market-view-list" style="display: none; margin-bottom: 8px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
                     <h4 style="color: #4db8ff; margin-bottom: 5px; font-size: 0.9em;">Mercado Actual</h4>

@@ -128,6 +128,66 @@ async function loadPlayers() {
     allPlayers = await res.json();
 }
 
+/**
+ * Recarga la base de datos de jugadores local y actualiza los stats de los que estan en el campo.
+ */
+async function refreshSquadStats() {
+    const btn = document.getElementById('btn-refresh-stats');
+    if (btn) btn.disabled = true;
+    showToast('Actualizando estadísticas locales...');
+    
+    try {
+        await loadPlayers();
+        // Actualizar el squad actual con los nuevos objetos (match por nombre)
+        for (let i = 0; i < squad.length; i++) {
+            if (squad[i]) {
+                const updated = allPlayers.find(p => p.name === squad[i].name);
+                if (updated) squad[i] = updated;
+            }
+        }
+        renderPitch();
+        updateSquadInfo();
+        showToast('Estadísticas actualizadas correctamente');
+    } catch (e) {
+        showToast('Error al actualizar estadísticas', true);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+/**
+ * Lanza el proceso de scraping en el servidor.
+ */
+async function triggerScraping() {
+    const btn = document.getElementById('btn-full-scrape');
+    if (!confirm('Esto lanzará un navegador en el servidor para descargar datos de UEFA.com. Tardará varios minutos. ¿Continuar?')) return;
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Scraping...';
+    }
+    showToast('Iniciando actualización UEFA (esto tardará)...');
+    
+    try {
+        const res = await fetch('/api/players/update', { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('¡UEFA Sync completado! Refrescando equipo...');
+            await refreshSquadStats();
+        } else {
+            showToast('Error: ' + data.error, true);
+        }
+    } catch (e) {
+        showToast('Error de conexión con el scraper', true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Update UEFA (Scraping)';
+        }
+    }
+}
+
 // ---------- FORMACIONES ----------
 function renderFormationButtons() {
     const grid = document.getElementById('formation-grid');

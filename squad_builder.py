@@ -137,6 +137,17 @@ def generate_market():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/players/update', methods=['POST'])
+def update_players_data():
+    """Lanza el scraper de UEFA para actualizar players.json."""
+    try:
+        from scrap_champions import scrape_players
+        scrape_players()
+        return jsonify({'success': True, 'message': 'Base de datos UEFA actualizada'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/market/current')
 def get_current_market():
     """Devuelve el mercado actualmente guardado en mercado.json."""

@@ -220,19 +220,11 @@ def obtener_analisis_squad() -> str:
 
         # Mostrar TODO el equipo con TODAS las stats de players.json
         for p in equipo:
-            stats = []
-            stats.append(f"Pts: {p.get('ptos_total','0')}")
-            stats.append(f"ROI: {p.get('ptos_por_euro','?')}")
-            stats.append(f"Forma: {p.get('estado_forma','?')}")
-            stats.append(f"Goles: {p.get('goles','0')}")
-            stats.append(f"Asist: {p.get('asistencias','0')}")
-            stats.append(f"Recup: {p.get('balones_recuperados','0')}")
-            stats.append(f"Mins: {p.get('mins_jugados','0')}")
-            stats.append(f"Fichado: {p.get('seleccionado','?')}")
-            if p.get('porteria_a_0') is not None and p.get('position') in ['POR', 'DEF']:
-                stats.append(f"CleanSheet: {p.get('porteria_a_0')}")
+            stats = f"Pts:{p.get('ptos_total','0')} | ROI:{p.get('ptos_por_euro','?')} | Frm:{p.get('estado_forma','?')} | G:{p.get('goles','0')} | A:{p.get('asistencias','0')} | R:{p.get('balones_recuperados','0')} | M:{p.get('mins_jugados','0')}"
+            if p.get('position') in ['POR', 'DEF']:
+                stats += f" | CS:{p.get('porteria_a_0','0')}"
             
-            reporte.append(f"[{p['position']}] {p['name']} ({p['price']}) -> " + " | ".join(stats))
+            reporte.append(f"[{p['position']}] {p['name']} ({p['price']}) -> {stats}")
 
         # 2. Cargar Mercado (Solo resumen para no sobrecargar context, salvo que pida mejorar)
         if os.path.exists(mercado_file):
