@@ -205,121 +205,107 @@ def buscar_noticias_jugador(query: str) -> str:
 # Agente
 # ---------------------------------------------------------------------------
 
+def _get_val(p, key, default=0):
+    """Helper interno para limpiar y obtener valores numéricos de los JSON."""
+    try:
+        v = p.get(key, default)
+        if isinstance(v, str):
+            v = v.replace('m','').replace('%','').replace('€','').strip()
+        return float(v) if v else float(default)
+    except: return float(default)
+
 @tool
-def generar_informe_detallado() -> str:
-    """Genera un informe estadístico profundo de la plantilla y el mercado.
-    Incluye rankings de goleadores, asistentes, recuperadores y rentabilidad (ROI).
-    Úsala como base para cualquier opinión técnica sobre el equipo.
+def evaluar_plantilla_actual() -> str:
+    """Evalúa SOLO los 11 jugadores de la plantilla actual. 
+    Devuelve desglose individual, goleadores, asistentes, recuperadores y balance por líneas.
+    """
+    base_dir = os.path.dirname(__file__)
+    equipo_file = os.path.join(base_dir, "plantilla.json")
+    if not os.path.exists(equipo_file):
+        return "Error: No hay equipo cargado. Añade jugadores primero."
+    
+    try:
+        with open(equipo_file, encoding="utf-8") as f:
+            equipo = json.load(f)
+        
+        informe = ["=== ANÁLISIS TÉCNICO DE LA PLANTILLA ==="]
+        informe.append("\n📋 DESGLOSE INDIVIDUAL:")
+        for p in equipo:
+            pts = _get_val(p, 'ptos_total')
+            prc = _get_val(p, 'price')
+            roi = p.get('ptos_por_euro', '?')
+            g, a, r = p.get('goles',0), p.get('asistencias',0), p.get('balones_recuperados',0)
+            informe.append(f"  - {p['name']} ({p['position']}): {prc}M | {int(pts)} Pts | ROI {roi} | G:{g} A:{a} R:{r}")
+
+        informe.append("\n🔝 LÍDERES ESTADÍSTICOS:")
+        top_g = sorted(equipo, key=lambda x: _get_val(x, 'goles'), reverse=True)[:1]
+        top_a = sorted(equipo, key=lambda x: _get_val(x, 'asistencias'), reverse=True)[:1]
+        top_r = sorted(equipo, key=lambda x: _get_val(x, 'balones_recuperados'), reverse=True)[:1]
+        if top_g: informe.append(f"  - Máximo Goleador: {top_g[0]['name']} ({top_g[0].get('goles',0)} G)")
+        if top_a: informe.append(f"  - Máximo Asistente: {top_a[0]['name']} ({top_a[0].get('asistencias',0)} A)")
+        if top_r: informe.append(f"  - Mejor Recuperador: {top_r[0]['name']} ({top_r[0].get('balones_recuperados',0)} R)")
+
+        informe.append("\n📊 BALANCE POR LÍNEAS (Media Pts):")
+        for pos in ['POR', 'DEF', 'CEN', 'DEL']:
+            p_pos = [p for p in equipo if p['position'] == pos]
+            avg = sum(_get_val(p, 'ptos_total') for p in p_pos)/len(p_pos) if p_pos else 0
+            informe.append(f"  - {pos}: {avg:.1f} pts de media")
+
+        return "\n".join(informe)
+    except Exception as e:
+        return f"Error en evaluación de plantilla: {str(e)}"
+
+@tool
+def evaluar_mercado_fichajes() -> str:
+    """Analiza SOLO el mercado disponible. Devuelve las mejores oportunidades por ROI.
+    """
+    base_dir = os.path.dirname(__file__)
+    mercado_file = os.path.join(base_dir, "mercado.json")
+    if not os.path.exists(mercado_file):
+        return "Error: El mercado no ha sido generado."
+    
+    try:
+        with open(mercado_file, encoding="utf-8") as f:
+            mercado = json.load(f)
+        
+        informe = ["=== OPORTUNIDADES DEL MERCADO (Mejor ROI) ==="]
+        mejores = sorted(mercado, key=lambda x: _get_val(x, 'ptos_por_euro'), reverse=True)[:5]
+        for p in mejores:
+            informe.append(f"  - [CHOLLO] {p['name']} ({p['position']}): {p['price']}M | ROI: {p.get('ptos_por_euro','?')}")
+        
+        return "\n".join(informe)
+    except Exception as e:
+        return f"Error en evaluación de mercado: {str(e)}"
+
+@tool
+def obtener_recomendaciones_cambio() -> str:
+    """Sugiere cambios estratégicos (Quién vender y quién fichar).
+    Compara el ROI bajo de tu equipo con el ROI alto del mercado.
     """
     base_dir = os.path.dirname(__file__)
     equipo_file = os.path.join(base_dir, "plantilla.json")
     mercado_file = os.path.join(base_dir, "mercado.json")
     
-    if not os.path.exists(equipo_file):
-        return "Error: No hay equipo cargado. Añade jugadores al campo."
-        
+    if not os.path.exists(equipo_file) or not os.path.exists(mercado_file):
+        return "Error: Se requieren plantilla y mercado para recomendar cambios."
+
     try:
-        with open(equipo_file, encoding="utf-8") as f:
-            equipo = json.load(f)
-            
-        def get_val(p, key, default=0):
-            try:
-                v = p.get(key, default)
-                if isinstance(v, str):
-                    v = v.replace('m','').replace('%','').strip()
-                return float(v) if v else float(default)
-            except: return float(default)
+        with open(equipo_file, encoding="utf-8") as f: equipo = json.load(f)
+        with open(mercado_file, encoding="utf-8") as f: mercado = json.load(f)
 
-        informe = ["=== INFORME ESTADÍSTICO PROFUNDO ==="]
+        peores_equipo = sorted(equipo, key=lambda x: _get_val(x, 'ptos_por_euro'))[:2]
+        mejores_mercado = sorted(mercado, key=lambda x: _get_val(x, 'ptos_por_euro'), reverse=True)[:2]
+
+        informe = ["=== ⚠️ RECOMENDACIONES DE CAMBIO ==="]
+        for v, f in zip(peores_equipo, mejores_mercado):
+            informe.append(f"  - VENDER: {v['name']} ({v['price']}M, ROI {v.get('ptos_por_euro','?')})")
+            informe.append(f"  - FICHAR: {f['name']} ({f['price']}M, ROI {f.get('ptos_por_euro','?')})")
+            informe.append(f"  - MOTIVO: Optimización de rentabilidad.")
+            informe.append("")
         
-        # Rankings de la Plantilla
-        if equipo:
-            # Full Roster Stats (Para que el agente pueda ver a todos)
-            informe.append("\n📋 DESGLOSE INDIVIDUAL DE LA PLANTILLA:")
-            for p in equipo:
-                pts = get_val(p, 'ptos_total')
-                prc = get_val(p, 'price')
-                roi = get_val(p, 'ptos_por_euro', '?')
-                g = p.get('goles',0)
-                a = p.get('asistencias',0)
-                r = p.get('balones_recuperados',0)
-                informe.append(f"  - {p['name']} ({p['position']}): {prc}M | {int(pts)} Pts | ROI {roi} | G:{g} A:{a} R:{r}")
-
-            # 1. Goleadores
-            top_g = sorted(equipo, key=lambda x: get_val(x, 'goles'), reverse=True)[:3]
-            informe.append("\n⚽ TOP GOLEADORES:")
-            for p in top_g:
-                if get_val(p, 'goles') > 0:
-                    informe.append(f"  - {p['name']}: {p.get('goles',0)} G")
-                
-            # 2. Asistentes
-            top_a = sorted(equipo, key=lambda x: get_val(x, 'asistencias'), reverse=True)[:3]
-            informe.append("\n👟 TOP ASISTENTES:")
-            for p in top_a:
-                if get_val(p, 'asistencias') > 0:
-                    informe.append(f"  - {p['name']}: {p.get('asistencias',0)} A")
-                
-            # 3. Muros (Recuperaciones)
-            top_r = sorted(equipo, key=lambda x: get_val(x, 'balones_recuperados'), reverse=True)[:3]
-            informe.append("\n🛡️ TOP RECUPERADORES (Muros):")
-            for p in top_r:
-                if get_val(p, 'balones_recuperados') > 0:
-                    informe.append(f"  - {p['name']}: {p.get('balones_recuperados',0)} R")
-                
-            # 4. Eficiencia (ROI)
-            top_roi = sorted(equipo, key=lambda x: get_val(x, 'ptos_por_euro'), reverse=True)[:3]
-            informe.append("\n📈 TOP RENTABILIDAD (ROI):")
-            for p in top_roi:
-                informe.append(f"  - {p['name']}: {p.get('ptos_por_euro','?')} ROI")
-
-            # 5. Rendimiento Crítico (Caro y pocos puntos)
-            criticos = [p for p in equipo if get_val(p, 'price') > 6 and get_val(p, 'ptos_total') < 30]
-            if criticos:
-                informe.append("\n⚠️ ALERTAS DE RENDIMIENTO (Caros/Bajos Pts):")
-                for p in criticos:
-                    informe.append(f"  - {p['name']} ({p['price']}M): {p.get('ptos_total',0)} pts (Baja rentabilidad)")
-
-        # Resumen de Posiciones
-        informe.append("\n📋 RESUMEN POR LÍNEAS:")
-        for pos in ['POR', 'DEF', 'CEN', 'DEL']:
-            players_pos = [p for p in equipo if p['position'] == pos]
-            count = len(players_pos)
-            pts = sum(get_val(p, 'ptos_total') for p in players_pos)
-            avg_pts = (pts / count) if count > 0 else 0
-            informe.append(f"  - {pos}: {count} jugadores | Pts Totales: {int(pts)} | Media: {avg_pts:.1f}")
-
-        # Mercado
-        if os.path.exists(mercado_file):
-            with open(mercado_file, encoding="utf-8") as f:
-                mercado = json.load(f)
-            informe.append("\n💎 OPORTUNIDADES DEL MERCADO (Top ROI):")
-            mejores_m = sorted(mercado, key=lambda x: get_val(x, 'ptos_por_euro'), reverse=True)[:3]
-            for p in mejores_m:
-                informe.append(f"  - [FICHAJE] {p['name']} ({p['price']}): ROI {p.get('ptos_por_euro','?')}")
-
         return "\n".join(informe)
-        
     except Exception as e:
-        return f"Error generando informe: {str(e)}"
-
-
-@tool
-def obtener_analisis_squad() -> str:
-    """Realiza un resumen rápido de los 11 jugadores actuales con sus stats básicas."""
-    base_dir = os.path.dirname(__file__)
-    equipo_file = os.path.join(base_dir, "plantilla.json")
-    if not os.path.exists(equipo_file):
-        return "Error: No hay equipo cargado."
-    try:
-        with open(equipo_file, encoding="utf-8") as f:
-            equipo = json.load(f)
-        reporte = [f"=== ESTADO DEL EQUIPO ({len(equipo)} jugadores) ==="]
-        for p in equipo:
-            stats = f"Pts:{p.get('ptos_total','0')} | ROI:{p.get('ptos_por_euro','?')} | Frm:{p.get('estado_forma','?')} | G:{p.get('goles','0')} | A:{p.get('asistencias','0')} | R:{p.get('balones_recuperados','0')} | M:{p.get('mins_jugados','0')}"
-            reporte.append(f"[{p['position']}] {p['name']} ({p['price']}) -> {stats}")
-        return "\n".join(reporte)
-    except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error en recomendaciones: {str(e)}"
 
 
 # ---------------------------------------------------------------------------

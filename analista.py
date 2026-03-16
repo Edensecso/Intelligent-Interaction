@@ -63,36 +63,30 @@ def buscar_noticias_jugadores(nombres: list[str]) -> str:
 
 def analizar(presupuesto: float) -> str:
     """
-    Instancia el Agent orquestador (Manager) y lanza la tarea de análisis.
-
-    Args:
-        presupuesto: Dinero disponible del usuario en millones (sin contar ventas).
+    Instancia el Agent orquestador (Manager) para análisis automático.
     """
-    from agent import generar_informe_detallado, buscar_noticias_jugador
+    from agent import evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador
     from smolagents import ToolCallingAgent
     
-    INSTRUCTIONS = f"""Eres el Analista Orquestador de un equipo de UCL Fantasy. Tu misión es dar recomendaciones basadas 100% en DATOS.
+    INSTRUCTIONS = f"""Eres el Analista Orquestador de UCL Fantasy. Tu misión es dar recomendaciones basadas 100% en DATOS.
 
 REGLAS DE ORO:
 1. SIEMPRE RESPONDE EN ESPAÑOL.
-2. EJECUTA 'generar_informe_detallado()' DE INMEDIATO para obtener los datos.
-3. Genera un análisis EXHAUSTIVO basado en Goles, Asistencias, Recuperaciones y ROI.
-4. BASA TU VEREDICTO EN DATOS, no seas genérico. NO PIDAS ARCHIVOS.
+2. Usa las herramientas modulares (evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio) según lo que necesites informar.
+3. Usa 'buscar_noticias_jugador' para corroborar el estado real de los jugadores.
 """
 
     model = _get_manager_model()
     
-    manager = CodeAgent(
-        tools=[buscar_noticias_jugadores, obtener_analisis_squad, buscar_noticias_jugador],
+    manager = ToolCallingAgent(
+        tools=[evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador],
         model=model,
         instructions=INSTRUCTIONS,
-        additional_authorized_imports=["json"],
         max_steps=10,
-        executor_kwargs={"timeout_seconds": 3600},
     )
     
-    print(f"\n[Analista] Iniciando orquestador CodeAgent con {presupuesto}M de presupuesto...")
-    resultado = manager.run("Realiza el análisis y devuelve la recomendación final estructurada.")
+    print(f"\n[Analista] Iniciando orquestador modular...")
+    resultado = manager.run("Realiza un análisis completo: evalúa mi plantilla, mira el mercado y dame recomendaciones finales.")
     return resultado
 
 def chatear(mensaje: str, historial: list, presupuesto: float) -> tuple[str, list]:
@@ -100,38 +94,35 @@ def chatear(mensaje: str, historial: list, presupuesto: float) -> tuple[str, lis
     Versión interactiva del analista para modo Chatbot.
     Cada llamada es "fresca" sin memoria persistente para evitar errores.
     """
-    from agent import buscar_noticias_jugador, generar_informe_detallado
+    from agent import buscar_noticias_jugador, evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio
     from smolagents import ToolCallingAgent
     
-    INSTRUCTIONS = f"""Eres el Analista Experto de UCL Fantasy. Tu misión es dar opiniones TÉCNICAS y ESTADÍSTICAS basadas en DATOS.
+    INSTRUCTIONS = f"""Eres el Analista Quirúrgico de UCL Fantasy. Tu misión es responder EXCLUSIVAMENTE a lo que se te pide usando la herramienta adecuada.
 
 REGLAS DE ORO:
-1. SIEMPRE RESPONDE EN ESPAÑOL. Es innegociable.
-2. NO PIDAS ARCHIVOS NI RUTAS. Ya tienes las herramientas para leer 'plantilla.json' automáticamente.
-3. EJECUTA 'generar_informe_detallado()' DE INMEDIATO para obtener los datos.
-4. BASA TU OPINIÓN EN: Puntos, Precio, ROI, Goles (G), Asistencias (A) y Recuperaciones (R).
-5. FORMATO DE RESPUESTA OBLIGATORIO:
-   - 📋 ANÁLISIS INDIVIDUAL (Lista los 11 jugadores): 
-     * [Nombre]: [Price]M | [Pts] Pts | G:[G] A:[A] R:[R]. -> Veredicto estadístico claro.
-   - 🏆 CONCLUSIÓN TÉCNICA
-   - ⚠️ RECOMENDACIONES CLAVE
-6. NO des explicaciones previas. Solo ejecuta la herramienta y entrega el informe estadístico.
+1. SIEMPRE RESPONDE EN ESPAÑOL.
+2. MODULARIDAD DE HERRAMIENTAS:
+   - Si piden opinión del EQUIPO: Usa 'evaluar_plantilla_actual()'.
+   - Si piden opinión del MERCADO: Usa 'evaluar_mercado_fichajes()'.
+   - Si piden FICHAJES/RECOMENDACIONES: Usa 'obtener_recomendaciones_cambio()'.
+3. BUSCADOR (Contexto Real): Si vas a recomendar un fichaje o evaluar a un crack, usa 'buscar_noticias_jugador(nombre)' para ver si está lesionado o en baja forma. ¡Aporta este valor extra!
+4. RESPUESTA QUIRÚRGICA: Si preguntan por el equipo, no hables del mercado. Si preguntan por cambios, no listes a todo el equipo. Solo entrega la sección correspondiente.
+5. SIN INTRODUCCIONES: Ve directo al grano con los datos.
+6. BASO TODO EN DATOS (G, A, R, ROI).
 """
 
     model = _get_manager_model()
     
     manager = ToolCallingAgent(
-        tools=[generar_informe_detallado, buscar_noticias_jugador],
+        tools=[evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador],
         model=model,
         instructions=INSTRUCTIONS,
-        max_steps=5,
+        max_steps=10, # Aumentamos para permitir búsqueda + análisis
     )
     
-    prompt_final = f"""[TRANSACCIÓN ÚNICA - SIN MEMORIA]
-PRESUPUESTO ACTUAL: {presupuesto}M
-MENSAJE DEL USUARIO: {mensaje}
+    prompt_final = f"""MENSAJE DEL USUARIO: {mensaje}
 
-Instrucción final: Ejecuta 'generar_informe_detallado' y genera el informe estadístico exhaustivo solicitado.
+RECUERDA: Identifica la intención del usuario y usa SOLO la herramienta necesaria. Si es relevante, busca noticias del jugador antes de dar el veredicto final.
 """
     
     resultado = manager.run(prompt_final)
