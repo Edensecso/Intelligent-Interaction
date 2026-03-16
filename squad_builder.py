@@ -151,10 +151,17 @@ def analizar_endpoint():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Endpoint para el chatbot interactivo."""
+    import re as _re
     data = request.get_json()
     user_msg = data.get('message', '')
     squad_data = data.get('squad', [])
     presupuesto = float(data.get('presupuesto', 0))
+
+    # Extraer presupuesto del texto si el cliente no lo envía (ej: "mi saldo es 10m")
+    if presupuesto == 0:
+        _match = _re.search(r'(\d+(?:[.,]\d+)?)\s*(?:m(?:illones?)?)', user_msg.lower())
+        if _match:
+            presupuesto = float(_match.group(1).replace(',', '.'))
 
     # Inicializar historial si no existe
     if 'chat_history' not in session:

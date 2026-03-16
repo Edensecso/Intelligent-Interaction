@@ -126,118 +126,138 @@ REGLAS DE ORO:
 
 def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str = "") -> tuple[str, list]:
     """Versión interactiva del analista para modo Chatbot.
-    Usa razonamiento + planificación + ejecución con selección de herramientas.
+    Pre-fetches structured data in Python, then asks the LLM only to search news + write analysis.
     """
-    # Importamos las herramientas REALES de agent.py (sin inventar nombres)
-    from agent import evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador
+    import re as _re
+    from agent import evaluar_plantilla_actual, obtener_recomendaciones_cambio, buscar_noticias_jugador
 
-    # Wrapper para buscar noticias con nombre descriptivo
     @tool
     def estado_forma_jugador_actual(nombre: str) -> str:
-        """Consulta noticias recientes y resume el estado de forma actual de un jugador.
-         Args:
-            nombre: Nombre del jugador (ej: 'Mbappe').
+        """Busca noticias recientes sobre el estado de forma, lesiones o rendimiento de un jugador.
+        Args:
+            nombre: Nombre del jugador (ej: 'Mbappe', 'Grimaldo').
         """
         return buscar_noticias_jugador(nombre)
 
-    INSTRUCTIONS = """Eres un Agente de IA experto en Fantasy Football UCL (Champions League).
-    Tu objetivo es actuar como un Director Técnico, proporcionando un ANÁLISIS ESTRATÉGICO basado en datos.
+    msg_display = (original_msg or mensaje or "").strip()
 
-    ESTRATEGIA OBLIGATORIA:
-    1. Usa las herramientas ejecutando código Python.
-    2. NUNCA devuelvas el texto bruto o diccionarios JSON al usuario. DEBES leer el resultado de la herramienta y redactar un texto fluido, natural y amigable en español.
-    3. DEBES terminar la conversación llamando a `final_answer(texto_redactado)`.
+    def _norm(txt):
+        return unicodedata.normalize("NFD", txt or "").lower()
 
-    HERRAMIENTAS:
-    - `evaluar_plantilla_actual()`: Analiza el equipo actual.
-    - `evaluar_mercado_fichajes()`: Analiza el mercado.
-    - `obtener_recomendaciones_cambio(posicion_objetivo=None)`: Para fichajes o ventas.
-    - `estado_forma_jugador_actual(nombre="...")`: Para buscar noticias/lesiones de un jugador.
+    msg_lower = _norm(msg_display)
+    print(f"[Analista-Chat] Pregunta: {msg_display}")
+
+    wants_plantilla = any(k in msg_lower for k in ["anali", "evalua", "plantilla", "equipo", "mi once"])
+    wants_cambios   = any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado", "maximo"])
+
+    pos = ""
+    if "delan" in msg_lower: pos = "DEL"
+    elif "medi" in msg_lower or "centr" in msg_lower: pos = "CEN"
+    elif "defen" in msg_lower: pos = "DEF"
+    elif "porte" in msg_lower: pos = "POR"
+
+    # ------------------------------------------------------------------
+    # PRE-FETCH: recoger datos estructurados ANTES de llamar al LLM
+    # ------------------------------------------------------------------
+    datos_context = ""
+    jugadores_a_buscar = []  # nombres para que el agente busque noticias
+
+    if wants_plantilla or wants_cambios:
+        try:
+            plantilla_txt = evaluar_plantilla_actual()
+            datos_context += f"=== DATOS DE LA PLANTILLA ===\n{plantilla_txt}\n\n"
+            # Estrella del equipo
+            m = _re.search(r'Maximo Goleador: ([^\(\n]+)', plantilla_txt)
+            if m:
+                jugadores_a_buscar.append(m.group(1).strip())
+        except Exception as e:
+            datos_context += f"[Error al cargar plantilla: {e}]\n\n"
+
+    if wants_cambios:
+        try:
+            cambios_txt = obtener_recomendaciones_cambio(pos)
+            datos_context += f"=== CAMBIOS RECOMENDADOS ===\n{cambios_txt}\n\n"
+            # Añadir jugadores de las operaciones a la lista de búsqueda
+            for nombre in _re.findall(r'VENDER: ([^\(\n]+)', cambios_txt):
+                jugadores_a_buscar.append(nombre.strip())
+            for nombre in _re.findall(r'FICHAR: ([^\(\n]+)', cambios_txt):
+                jugadores_a_buscar.append(nombre.strip())
+        except Exception as e:
+            datos_context += f"[Error al cargar cambios: {e}]\n\n"
+
+    # Eliminar duplicados manteniendo orden
+    seen = set()
+    jugadores_unicos = [j for j in jugadores_a_buscar if not (j in seen or seen.add(j))]
+
+    # Construir lista de búsquedas a realizar (el agente las ejecutará)
+    busquedas_hint = ""
+    if jugadores_unicos:
+        calls = "\n".join(
+            f'print(estado_forma_jugador_actual("{j}")[:600])' for j in jugadores_unicos
+        )
+        busquedas_hint = (
+            f"JUGADORES A INVESTIGAR (busca noticias de cada uno):\n"
+            f"```python\n{calls}\n```\n\n"
+        )
+
+    # ------------------------------------------------------------------
+    # Instrucciones del agente: solo buscar noticias + redactar análisis
+    # ------------------------------------------------------------------
+    INSTRUCTIONS = """Eres un Director Técnico experto en Fantasy Football UCL.
+Se te proporcionan datos estructurados del equipo. Tu ÚNICA misión es:
+1. Buscar noticias de los jugadores indicados con estado_forma_jugador_actual().
+2. Redactar un análisis estratégico en español fluido con final_answer().
+
+REGLAS:
+- NUNCA copies tablas de datos en bruto. Interprétalas en texto fluido.
+- NUNCA inventes datos. Usa solo los datos proporcionados y las búsquedas.
+- SIEMPRE usa triple-quote para el texto y asígnalo a una variable antes de llamar final_answer.
+
+EL ÚNICO FORMATO VÁLIDO ES ESTE (con variable y triple-quote):
+```python
+texto = \"\"\"Tu análisis aquí,
+puede ocupar varias líneas,
+sin problema.\"\"\"
+final_answer(texto)
+```
+
+NUNCA escribas final_answer(...) directamente con el texto dentro sin usar una variable.
 """
 
     model = _get_manager_model()
-    
-    # Lista de herramientas con los nombres correctos
-    tools = [
-        evaluar_plantilla_actual,
-        evaluar_mercado_fichajes,
-        obtener_recomendaciones_cambio,
-        estado_forma_jugador_actual,
-    ]
-
     manager = CodeAgent(
-        tools=tools,
+        tools=[estado_forma_jugador_actual],
         model=model,
         instructions=INSTRUCTIONS,
-        additional_authorized_imports=["json", "datetime"],
-        max_steps=5, # Reduzco steps para evitar bucles tontos
+        additional_authorized_imports=["re"],
+        max_steps=10,
     )
 
-    msg_display = (original_msg or mensaje or "").strip()
-    
-    # Normalizar para búsquedas
-    def _norm_light(txt: str) -> str:
-        return unicodedata.normalize("NFD", txt or "").lower()
-
-    msg_lower = _norm_light(msg_display)
-    
-    print(f"[Analista-Chat] Pregunta: {msg_display}")
-
-    # --- ENRUTADOR HEURÍSTICO (Ayuda para modelos pequeños) ---
-    # Detectamos la intención para guiar al modelo y evitar que se quede bloqueado.
-    
-    hint_instruction = ""
-    if any(k in msg_lower for k in ["anali", "evalua", "plantilla", "equipo", "mi once"]):
-        hint_instruction = (
-            "PISTA OBLIGATORIA:\n"
-            "1. Ejecuta: `datos = evaluar_plantilla_actual()`\n"
-            "2. IMPORTANTE: Los datos que recibes NO son un diccionario, es TEXTO. No intentes usar json.loads() ni acceder a claves como ['jugadores'].\n"
-            "3. En lugar de procesar datos, lee el texto devuelto y redáctanos un resumen.\n"
-            "4. Luego obtén el nombre de la estrella del equipo MANUALMENTE (ej: 'Mbappe') y busca noticias: `res = estado_forma_jugador_actual('Mbappe')`.\n"
-            "5. Finaliza llamando a `final_answer(datos + '\n' + res)`."
-        )
-    elif any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado"]):
-        pos = ""
-        if "delan" in msg_lower: pos = "DEL"
-        elif "medi" in msg_lower or "centr" in msg_lower: pos = "CEN"
-        elif "defen" in msg_lower: pos = "DEF"
-        elif "porte" in msg_lower: pos = "POR"
-        
-        pos_arg = f'posicion_objetivo="{pos}"' if pos else ""
-        hint_instruction = (
-            f"PISTA: El usuario quiere hacer cambios. \n"
-            f"1. Ejecuta: `datos = obtener_recomendaciones_cambio({pos_arg})`\n"
-            f"2. Redacta las recomendaciones con tus propias palabras (no copies y pegues).\n"
-            f"3. Finaliza con: `final_answer(tu_texto_redactado)`"
-        )
-    elif any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta"]):
-        hint_instruction = (
-            "PISTA: Identifica el nombre del jugador y ejecuta: `res = estado_forma_jugador_actual(nombre='Nombre')`\n"
-            "Luego redacta la respuesta natural con `final_answer(res)`."
-        )
-
-    # Prompt user message reforzado
     prompt = (
-        f"PREGUNTA DEL USUARIO: '{msg_display}'\n"
+        f"PREGUNTA: '{msg_display}'\n"
         f"PRESUPUESTO: {presupuesto}M\n\n"
-        f"{hint_instruction}\n\n"
-        "TU ACCIÓN: Escribe el código Python necesario para ejecutar la herramienta correcta "
-        "y devuelve el resultado con `final_answer(...)`."
+        f"{datos_context}"
+        f"{busquedas_hint}"
+        "TAREA: Busca las noticias de los jugadores indicados y redacta un análisis "
+        "estratégico completo en español que incluya:\n"
+        "- Estado de cada línea del equipo\n"
+        "- Qué vender y por qué (nombre, precio, ROI)\n"
+        "- Qué fichar y por qué (nombre, precio, mejora ROI)\n"
+        "- Cálculo presupuestario (ventas + saldo = presupuesto total disponible)\n"
+        "- Estado de forma de cada jugador involucrado\n"
+        "- Priorización de los cambios\n\n"
+        "Llama a final_answer() con el análisis redactado."
     )
 
     try:
-        # Ejecutamos el agente
         respuesta_agente = manager.run(prompt)
-        # Convertimos a string por seguridad
         respuesta_texto = str(respuesta_agente)
     except Exception as e:
         respuesta_texto = f"Ocurrió un error al procesar tu solicitud: {str(e)}"
         print(f"[Analista-Chat] Error: {e}")
 
-    # Guardar en historial
     historial.append({"role": "user", "content": msg_display})
     historial.append({"role": "assistant", "content": respuesta_texto})
-    
     return respuesta_texto, historial
 
 # ---------------------------------------------------------------------------
