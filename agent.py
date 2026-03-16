@@ -108,21 +108,6 @@ def analyze_market() -> str:
         return "Error: primero genera el mercado con generate_market."
     return procesar_mercado(_estado["mercado"], get_model())
 
-
-@tool
-def evaluar_plantilla_actual() -> str:
-    """
-    Carga y analiza la plantilla actual. 
-    Usa esta herramienta al inicio para entender el estado del equipo.
-    """
-    if not _estado["equipo"]:
-        res = load_team()  # Intenta cargar plantilla.json por defecto
-        if "Error" in res:
-            return f"No se pudo cargar la plantilla automáticamente: {res}"
-            
-    return analyze_team()
-
-
 @tool
 def evaluar_mercado_fichajes() -> str:
     """
@@ -391,14 +376,16 @@ def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    AGENT_INSTRUCTIONS = (
-        "Eres un agente especialista en UCL Fantasy (Champions League Fantasy Football). "
-        "SOLO puedes responder preguntas relacionadas con Fantasy UCL: plantillas, jugadores, "
-        "fichajes, ventas, mercado, estadísticas y estado de forma de jugadores de Champions League. "
-        "Si el usuario pregunta algo que NO sea sobre Fantasy UCL, responde EXACTAMENTE: "
-        "'Solo puedo ayudar con consultas de Fantasy UCL (plantilla, mercado, fichajes, ventas y estado de jugadores).' "
-        "Responde siempre en español."
-    )
+    AGENT_INSTRUCTIONS = ("""Eres el Director Técnico de un equipo de Fantasy UCL. 
+                            Tu objetivo no es solo dar datos, sino proporcionar un ANALISIS ESTRATÉGICO.
+                            FLUJO DE PENSAMIENTO OBLIGATORIO:
+                            1. Si analizas la plantilla, identifica a los 2 jugadores con más puntos o más caros.
+                            2. Llama a 'estado_forma_jugador_actual' para esos jugadores clave para descartar lesiones.
+                            3. Cruza esa información con las recomendaciones de cambio.
+                            4. RESPUESTA FINAL: Redacta un texto fluido y profesional en español. No copies tablas de datos; explica qué significan (ej: "Tu defensa está sólida pero Mbappé es duda por molestias, así que...").
+
+                            REGLA CRÍTICA: Nunca devuelvas código o JSON al usuario. Usa 'final_answer' para enviar un mensaje redactado por ti."""
+                                )
 
     agente = CodeAgent(
         tools=[

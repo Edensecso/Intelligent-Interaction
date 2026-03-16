@@ -197,7 +197,18 @@ def chat():
             original_msg=user_msg,
         )
 
-        session['chat_history'] = updated_history
+        # Recortar el historial para que Flask no explote con el tamaño de la cookie
+        MAX_MENSAJES = 4
+        MAX_LONGITUD_TEXTO = 400 
+        
+        historial_recortado = []
+        for msg in updated_history[-MAX_MENSAJES:]:
+            texto = str(msg.get('content', ''))
+            if len(texto) > MAX_LONGITUD_TEXTO:
+                texto = texto[:MAX_LONGITUD_TEXTO] + "... [texto truncado]"
+            historial_recortado.append({"role": msg['role'], "content": texto})
+
+        session['chat_history'] = historial_recortado
         session.modified = True
         
         return jsonify({'success': True, 'response': str(respuesta)})

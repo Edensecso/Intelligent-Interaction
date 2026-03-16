@@ -141,35 +141,18 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
         return buscar_noticias_jugador(nombre)
 
     INSTRUCTIONS = """Eres un Agente de IA experto en Fantasy Football UCL (Champions League).
-Tu objetivo es ayudar al usuario a gestionar su equipo y mercado.
+    Tu objetivo es actuar como un Director Técnico, proporcionando un ANÁLISIS ESTRATÉGICO basado en datos.
 
-ESTRATEGIA OBLIGATORIA:
-1. Cuando el usuario pida algo, EJECUTA la herramienta correspondiente mediante código Python.
-2. La herramienta devolverá texto con la información.
-3. DEBES terminar la conversación llamando a `final_answer(texto_resultado)`.
+    ESTRATEGIA OBLIGATORIA:
+    1. Usa las herramientas ejecutando código Python.
+    2. NUNCA devuelvas el texto bruto o diccionarios JSON al usuario. DEBES leer el resultado de la herramienta y redactar un texto fluido, natural y amigable en español.
+    3. DEBES terminar la conversación llamando a `final_answer(texto_redactado)`.
 
-HERRAMIENTAS:
-- `evaluar_plantilla_actual()`: Para "analizar equipo/plantilla".
-- `evaluar_mercado_fichajes()`: Para "ver mercado".
-- `obtener_recomendaciones_cambio(posicion_objetivo=None)`: Para "fichajes", "recomendaciones" o "cambios".
-- `estado_forma_jugador_actual(nombre="...")`: Para preguntas sobre un jugador.
-
-EJEMPLOS DE CÓDIGO A GENERAR:
-
-Caso 1: "Analiza mi equipo"
-```python
-resultado = evaluar_plantilla_actual()
-final_answer(resultado) # ¡IMPORTANTE USAR final_answer!
-```
-
-Caso 2: "Recomienda delanteros"
-```python
-resultado = obtener_recomendaciones_cambio(posicion_objetivo="DEL")
-final_answer(resultado)
-```
-
-REGLA CLAVE:
-Si no llamas a `final_answer()`, la respuesta NO le llegará al usuario. ¡ÚSALO SIEMPRE AL FINAL!
+    HERRAMIENTAS:
+    - `evaluar_plantilla_actual()`: Analiza el equipo actual.
+    - `evaluar_mercado_fichajes()`: Analiza el mercado.
+    - `obtener_recomendaciones_cambio(posicion_objetivo=None)`: Para fichajes o ventas.
+    - `estado_forma_jugador_actual(nombre="...")`: Para buscar noticias/lesiones de un jugador.
 """
 
     model = _get_manager_model()
@@ -204,16 +187,16 @@ Si no llamas a `final_answer()`, la respuesta NO le llegará al usuario. ¡ÚSAL
     # Detectamos la intención para guiar al modelo y evitar que se quede bloqueado.
     
     hint_instruction = ""
-    # Detectar análisis de plantilla primero para evitar solape
     if any(k in msg_lower for k in ["anali", "evalua", "plantilla", "equipo", "mi once"]):
         hint_instruction = (
-            "PISTA: El usuario quiere un análisis de su equipo. \n"
-            "1. Ejecuta: `analisis = evaluar_plantilla_actual()`\n"
-            "2. IMPORTANTE: Finaliza llamando a `final_answer(analisis)`."
+            "PISTA OBLIGATORIA:\n"
+            "1. Ejecuta: `datos = evaluar_plantilla_actual()`\n"
+            "2. IMPORTANTE: Los datos que recibes NO son un diccionario, es TEXTO. No intentes usar json.loads() ni acceder a claves como ['jugadores'].\n"
+            "3. En lugar de procesar datos, lee el texto devuelto y redáctanos un resumen.\n"
+            "4. Luego obtén el nombre de la estrella del equipo MANUALMENTE (ej: 'Mbappe') y busca noticias: `res = estado_forma_jugador_actual('Mbappe')`.\n"
+            "5. Finaliza llamando a `final_answer(datos + '\n' + res)`."
         )
-
-    # Caso 1: Fichajes / Ventas / Mercado (Tiene prioridad si la frase es mixta "analiza y ficha")
-    if any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado"]):
+    elif any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado"]):
         pos = ""
         if "delan" in msg_lower: pos = "DEL"
         elif "medi" in msg_lower or "centr" in msg_lower: pos = "CEN"
@@ -222,20 +205,16 @@ Si no llamas a `final_answer()`, la respuesta NO le llegará al usuario. ¡ÚSAL
         
         pos_arg = f'posicion_objetivo="{pos}"' if pos else ""
         hint_instruction = (
-            f"PISTA: El usuario quiere hacer cambios o fichajes. \n"
-            f"DEBES ejecutar: `resultado = obtener_recomendaciones_cambio({pos_arg})`\n"
-            f"Y luego finalizar con: `final_answer(resultado)`"
+            f"PISTA: El usuario quiere hacer cambios. \n"
+            f"1. Ejecuta: `datos = obtener_recomendaciones_cambio({pos_arg})`\n"
+            f"2. Redacta las recomendaciones con tus propias palabras (no copies y pegues).\n"
+            f"3. Finaliza con: `final_answer(tu_texto_redactado)`"
         )
-
-    # Caso 2: Jugador Específico (Estado / Lesión)
-    if any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta"]):
-        # Intentar extraer nombre simple (muy básico)
+    elif any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta"]):
         hint_instruction = (
-            "PISTA: El usuario pregunta por el estado de un jugador. \n"
-            "Identifica el nombre del jugador en la pregunta y ejecuta: `resultado = estado_forma_jugador_actual(nombre='NombreJugador')`\n"
-            "Y luego finalizar con: `final_answer(resultado)`"
+            "PISTA: Identifica el nombre del jugador y ejecuta: `res = estado_forma_jugador_actual(nombre='Nombre')`\n"
+            "Luego redacta la respuesta natural con `final_answer(res)`."
         )
-
 
     # Prompt user message reforzado
     prompt = (

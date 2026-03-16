@@ -53,10 +53,13 @@ def buscar(pregunta: str) -> str:
     """
     search_tool = DuckDuckGoSearchTool()
     
+    # Añadimos contexto para evitar resultados raros como el actor de doblaje de anime
+    query_optimizada = f"{pregunta} jugador futbol lesion champions league noticias"
+    
     try:
-        # 1. Búsqueda directa (sin agente intermedio)
-        print(f"  [Web] Consultando DuckDuckGo: {pregunta}")
-        resultados_raw = search_tool(pregunta)
+        # 1. Búsqueda directa
+        print(f"  [Web] Consultando DuckDuckGo: {query_optimizada}")
+        resultados_raw = search_tool(query_optimizada)
         
         if not resultados_raw or "no results" in str(resultados_raw).lower():
             return "No se han encontrado noticias recientes en la web."
@@ -68,7 +71,7 @@ def buscar(pregunta: str) -> str:
             "Eres analista de fantasy fútbol Champions League. Responde siempre en español. "
             "A partir de estos resultados de búsqueda, resume la situación del jugador/equipo: "
             "lesiones, estado de forma, si es titular probable y rendimiento reciente. "
-            "Sé muy conciso (máx. 4 frases)."
+            "Sé muy conciso (máx. 4 frases) y no inventes datos."
         )
         
         messages = [
@@ -87,7 +90,7 @@ def buscar(pregunta: str) -> str:
             )
         return str(content)
     except Exception as e:
-        return f"Error en la b\u00fasqueda web: {str(e)}"
+        return f"Error en la búsqueda web: {str(e)}"
 
 
 # ---------------------------------------------------------------------------
