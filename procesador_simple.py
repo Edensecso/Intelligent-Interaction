@@ -31,7 +31,7 @@ def get_model() -> LiteLLMModel:
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     # Fallback: Ollama local
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen3:4b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
@@ -89,6 +89,31 @@ def procesar_mercado(mercado: list[dict], model: LiteLLMModel) -> str:
         "Justifica cada uno en una línea."
     )
     return _llamar_llm(model, instruccion, mercado)
+
+
+def procesar_mercado_detallado(mercado: list[dict], model: LiteLLMModel) -> str:
+    """
+    Análisis profundo del mercado actual explicando el porqué de cada opción.
+    """
+    # Ordenar por ROI para dar solo los mejores
+    try:
+        top_mercado = sorted(mercado, key=lambda x: float(str(x.get('ptos_por_euro', 0)).replace(',','.')), reverse=True)[:5]
+    except:
+        top_mercado = mercado[:5]
+
+    instruccion = (
+        "IMPORTANTE: Responde ÚNICAMENTE en español. "
+        "Eres un ojeador experto de UCL Fantasy. "
+        "Analiza estas oportunidades de mercado y genera un informe detallado. "
+        "REGLAS CRÍTICAS PARA EVITAR ALUCINACIONES:\n"
+        "1. NO INVENTES PROPIEDADES: Si un jugador es defensa, no digas que es portero.\n"
+        "2. NO INVENTES HABILIDADES: No digas que tienen habilidades de otros deportes (ej: baloncesto).\n"
+        "3. CIÑETE A LOS DATOS: Usa solo los puntos, precio y ROI proporcionados.\n"
+        "4. IMPACTO FANTASY: Explica su valor en términos de puntos por millón.\n"
+        "5. NO INVENTES EQUIPOS: Usa solo el 'team_match' o el equipo que venga en el JSON.\n\n"
+        "Analiza solo estos jugadores:"
+    )
+    return _llamar_llm(model, instruccion, top_mercado)
 
 
 def procesar_cambios(equipo: list[dict], mercado: list[dict], model: LiteLLMModel) -> str:

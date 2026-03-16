@@ -47,11 +47,11 @@ def recomendar_cambios_desde_datos(posicion_objetivo: str = "") -> str:
     Args:
         posicion_objetivo: Opcional (POR, DEF, CEN, DEL).
     """
-    from agent import evaluar_mercado_fichajes, obtener_recomendaciones_cambio
+    from agent import analizar_mercado, obtener_recomendaciones_cambio
 
-    mercado = evaluar_mercado_fichajes()
+    mercado = analizar_mercado()
     recomendaciones = obtener_recomendaciones_cambio(posicion_objetivo)
-    return f"{recomendaciones}\n\n=== MERCADO (SCRIPT INTERNO) ===\n{mercado}"
+    return f"{recomendaciones}\n\n=== MERCADO (ANÁLISIS DETALLADO) ===\n{mercado}"
 
 
 @tool
@@ -98,8 +98,8 @@ REGLAS DE ORO:
     
     # Asegúrate de importar las herramientas correctamente
     try:
-        from agent import evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador
-        tools_list = [evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador]
+        from agent import evaluar_plantilla_actual, analizar_mercado, obtener_recomendaciones_cambio, buscar_noticias_jugador
+        tools_list = [evaluar_plantilla_actual, analizar_mercado, obtener_recomendaciones_cambio, buscar_noticias_jugador]
     except ImportError as e:
         return f"Error crítico de importación de herramientas: {str(e)}. Verifica agent.py."
 
@@ -131,7 +131,7 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     Pre-fetches structured data in Python, then asks the LLM only to search news + write analysis.
     """
     import re as _re
-    from agent import evaluar_plantilla_actual, obtener_recomendaciones_cambio, buscar_noticias_jugador
+    from agent import evaluar_plantilla_actual, analizar_mercado, obtener_recomendaciones_cambio, buscar_noticias_jugador
 
     @tool
     def estado_forma_jugador_actual(nombre: str) -> str:
@@ -150,8 +150,12 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     print(f"[Analista-Chat] Pregunta: {msg_display}")
 
     wants_plantilla = any(k in msg_lower for k in ["anali", "evalua", "plantilla", "equipo", "mi once"])
-    wants_cambios   = any(k in msg_lower for k in ["fich", "comprar", "vend", "cambio", "recomenda", "suger", "mercado", "maximo"])
-    wants_forma     = any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta"])
+    wants_mercado   = any(k in msg_lower for k in ["mercado", "opciones", "oportunidades", "ojeador"])
+    wants_cambios   = any(k in msg_lower for k in ["fich", "vend", "cambio", "recomenda", "suger", "maximo", "intercambio"])
+    # Detectar intención de pares directos (quién por quién) y si quiere solo uno
+    wants_pairs     = any(k in msg_lower for k in ["quien por quien", "fichajes por separado", "par de cambios", "un fichaje", "el mejor", "recomiendame"])
+    wants_single    = any(k in msg_lower for k in ["solo uno", "un solo", "el mejor", "cual seria", "elige uno", "me recomiendas uno", "recomiendame un", "recomienda un"])
+    wants_forma     = any(k in msg_lower for k in ["estado", "forma", "lesion", "noticia", "como esta", "informacion", "info", "quien es", "que tal", "novedad"])
 
     pos = ""
     if "delan" in msg_lower: pos = "DEL"
@@ -175,26 +179,50 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
         except Exception as e:
             datos_context += f"[Error al cargar plantilla: {e}]\n\n"
 
-    if wants_cambios:
+    if wants_mercado:
         try:
-            cambios_txt = obtener_recomendaciones_cambio(pos)
-            datos_context += f"=== CAMBIOS RECOMENDADOS ===\n{cambios_txt}\n\n"
+            mercado_txt = analizar_mercado()
+            datos_context += f"=== OPORTUNIDADES DEL MERCADO ===\n{mercado_txt}\n\n"
+            # Extraer nombres de jugadores del mercado para buscar noticias
+            # Los nombres suelen estar en formato '1. **Nombre**' o similar
+            for nombre in _re.findall(r'\*\*([^*]+)\*\*', mercado_txt):
+                if len(nombre.strip()) > 3:
+                    jugadores_a_buscar.append(nombre.strip())
+        except Exception as e:
+            datos_context += f"[Error al cargar mercado: {e}]\n\n"
+
+    if wants_cambios or wants_pairs:
+        try:
+            # Si el usuario pregunta por "uno solo" o "el mejor", forzar resultado aunque la plantilla sea óptima
+            cambios_txt = obtener_recomendaciones_cambio(pos, forzar=wants_single)
+            datos_context += f"=== RECOMENDACIONES DE CAMBIO (Quién por Quién) ===\n{cambios_txt}\n\n"
+            # Capturar nombres para buscar noticias
             for nombre in _re.findall(r'VENDER: ([^\(\n]+)', cambios_txt):
-                jugadores_a_buscar.append(nombre.strip())
+                jugadores_a_buscar.append(nombre.strip().split('(')[0].strip())
             for nombre in _re.findall(r'FICHAR: ([^\(\n]+)', cambios_txt):
-                jugadores_a_buscar.append(nombre.strip())
+                jugadores_a_buscar.append(nombre.strip().split('(')[0].strip())
         except Exception as e:
             datos_context += f"[Error al cargar cambios: {e}]\n\n"
 
-    # Para preguntas de forma: extraer el nombre del jugador del mensaje
-    if wants_forma and not jugadores_a_buscar:
-        # Busca nombres propios (palabras con mayúscula) en el mensaje original
-        nombres_msg = _re.findall(r'\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*\b', msg_display)
-        jugadores_a_buscar = [n for n in nombres_msg if len(n) > 3]
+    # Para preguntas de forma/información: extraer el nombre del jugador del mensaje
+    if (wants_forma or True) and not jugadores_a_buscar:
+        # Busca nombres complejos (K. Furo, Carlos Forbs, etc)
+        nombres_msg = _re.findall(r'\b(?:[A-Z]\.\s+)?[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b)*', msg_display)
+        # También buscar en minúsculas si coinciden con palabras comunes de jugadores
+        for word in _re.findall(r'\b[a-z]{4,}\b', msg_lower):
+            if any(p in word for p in ["oshim", "osim", "mbap", "haala", "kane", "vini", "bellin", "furo", "forbis", "forbs"]):
+                nombres_msg.append(word.capitalize())
+        
+        jugadores_a_buscar = [n.strip() for n in nombres_msg if len(n) > 3]
 
     # Eliminar duplicados manteniendo orden
     seen = set()
-    jugadores_unicos = [j for j in jugadores_a_buscar if not (j in seen or seen.add(j))]
+    jugadores_unicos = []
+    for j in jugadores_a_buscar:
+        j_clean = j.strip().strip(',').strip('.')
+        if j_clean.lower() not in seen:
+            jugadores_unicos.append(j_clean)
+            seen.add(j_clean.lower())
 
     # Hint de búsquedas para el agente
     busquedas_hint = ""
@@ -218,6 +246,29 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
             "- Estado de forma de cada jugador involucrado\n"
             "- Priorización de los cambios"
         )
+    elif wants_mercado and not wants_cambios:
+         tarea = (
+            "TAREA: Redacta una OPINIÓN PROFESIONAL sobre el MERCADO actual en español.\n"
+            "- Menciona los mejores jugadores disponibles según los datos pre-cargados.\n"
+            "- Justifica por qué son buenas opciones (ROI, puntos, precio).\n"
+            "- No hables de cambios específicos de mi plantilla a menos que se te pida."
+        )
+    elif wants_pairs:
+        tipo = "UN SOLO FICHAJE" if wants_single else "QUIÉN POR QUIÉN"
+        tarea = (
+            f"TAREA: Responde a la petición de '{tipo}' en español.\n"
+            "- El usuario quiere que elijas el mejor movimiento posible (o uno solo si lo pide).\n"
+            "- Usa EXCLUSIVAMENTE los pares VENDER -> FICHAR pre-calculados arriba.\n"
+            "- NO INVENTES JUGADORES (No Neymar, No Di Maria, No Pogba).\n"
+            "- Si el usuario pide UNO SOLO, elige el que tenga mayor IMPACTO (+ pts/M) o la mejor nota.\n"
+            "- DEBES llamar a estado_forma_jugador_actual() para verificar si el jugador a fichar o vender tiene noticias de última hora."
+        )
+    elif wants_forma or "informacion" in msg_lower or "noticia" in msg_lower:
+        tarea = (
+            "TAREA: Busca noticias del jugador o jugadores indicados y responde con un resumen de su estado de forma en español.\n"
+            "- Usa OBLIGATORIAMENTE estado_forma_jugador_actual() para cada jugador mencionado.\n"
+            "- No respondas 'No tengo información' sin antes haber usado la herramienta."
+        )
     elif wants_plantilla:
         tarea = (
             "TAREA: Busca noticias del jugador estrella y redacta un análisis del estado del equipo en español:\n"
@@ -238,22 +289,17 @@ def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str
     # ------------------------------------------------------------------
     # Instrucciones del agente: solo buscar noticias + responder
     # ------------------------------------------------------------------
-    INSTRUCTIONS = """Eres un asistente de Fantasy Football UCL.
+    INSTRUCTIONS = """Eres un asistente experto de Fantasy Football UCL.
 Responde EXACTAMENTE lo que te pregunta el usuario, ni más ni menos.
-Si preguntan por el estado de un jugador, habla solo de ese jugador.
-Si preguntan por cambios, habla de cambios. No añadas secciones que no se pidan.
+REGLA ANTI-ALUCINACIÓN:
+1. SIEMPRE usa estado_forma_jugador_actual() para confirmar datos de jugadores desconocidos.
+2. NUNCA inventes posiciones (un defensa no es portero).
+3. NUNCA inventes equipos o habilidades extrañas.
+4. Si no tienes datos en el contexto ni en el buscador, di simplemente que no tienes esa información.
 
-Usa estado_forma_jugador_actual() para buscar noticias antes de responder.
-
-FORMATO OBLIGATORIO:
-```python
-texto = \"\"\"Tu respuesta en español aquí.\"\"\"
-final_answer(texto)
-```
-
-NUNCA escribas el texto fuera de un bloque de código.
-NUNCA uses final_answer("...largo...") — usa siempre la variable `texto`.
-NUNCA inventes datos.
+Al finalizar tu análisis, debes llamar a final_answer() pasando un único argumento que sea tu respuesta redactada COMPLETAMENTE en español.
+NO utilices textos de ejemplo como 'Tu respuesta aquí'. Escribe contenido real y útil basado en los datos.
+MÁNDATORY: Si el usuario pregunta por un jugador específico (como Osimhen/Oshimen), DEBES llamar a estado_forma_jugador_actual() antes de responder.
 """
 
     model = _get_manager_model()

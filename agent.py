@@ -101,12 +101,25 @@ def analyze_team() -> str:
 
 @tool
 def analyze_market() -> str:
-    """Analiza el mercado actual con el procesador simple (qwen3:14b).
-    Recomienda los 3 mejores fichajes."""
+    """Análisis rápido del mercado (resumen breve)."""
     from procesador_simple import procesar_mercado, get_model
     if not _estado["mercado"]:
-        return "Error: primero genera el mercado con generate_market."
+        load_market()
+    if not _estado["mercado"]:
+        return "Error: primero genera el mercado en la UI."
     return procesar_mercado(_estado["mercado"], get_model())
+
+@tool
+def analizar_mercado() -> str:
+    """Realiza un análisis PROFUNDO del mercado actual. 
+    Explica detalladamente por qué fichar a los mejores jugadores basándose en ROI y puntos.
+    """
+    from procesador_simple import procesar_mercado_detallado, get_model
+    if not _estado["mercado"]:
+        load_market()
+    if not _estado["mercado"]:
+        return "Error: No se encontró el mercado. Genéralo primero."
+    return procesar_mercado_detallado(_estado["mercado"], get_model())
 
 @tool
 def evaluar_mercado_fichajes() -> str:
@@ -315,13 +328,13 @@ def evaluar_mercado_fichajes() -> str:
         return f"Error en evaluación de mercado: {str(e)}"
 
 @tool
-def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
+def obtener_recomendaciones_cambio(posicion_objetivo: str = "", forzar: bool = False) -> str:
     """Sugiere cambios estratégicos (Quién vender y quién fichar).
     Compara el ROI bajo de tu equipo con el ROI alto del mercado RESPETANDO LA POSICIÓN.
-    Nunca sugiere vender un DEF para fichar un DEL ni posiciones cruzadas.
-
+    
     Args:
         posicion_objetivo: Opcional. Una de POR, DEF, CEN, DEL para limitar la recomendación.
+        forzar: Si True, devuelve la mejor pareja disponible aunque no haya ganancia real de ROI.
     """
     base_dir = os.path.dirname(__file__)
     equipo_file = os.path.join(base_dir, "plantilla.json")
@@ -334,7 +347,8 @@ def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
         with open(equipo_file, encoding="utf-8") as f: equipo = json.load(f)
         with open(mercado_file, encoding="utf-8") as f: mercado = json.load(f)
 
-        informe = ["=== RECOMENDACIONES DE CAMBIO (por posición) ==="]
+        informe = ["=== RECOMENDACIONES DE CAMBIO DIRECTO ==="]
+        if forzar: informe = ["=== MEJOR OPCIÓN DISPONIBLE (FORZADA) ==="]
         recomendaciones = 0
 
         posiciones = ['POR', 'DEF', 'CEN', 'DEL']
@@ -343,28 +357,36 @@ def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
             posiciones = [pos_obj]
 
         for pos in posiciones:
+            # Filtrar por posición y ASEGURAR que tengan puntos (evitar 'muertos')
             jugadores_pos = [p for p in equipo if p.get('position') == pos]
-            mercado_pos   = [p for p in mercado if p.get('position') == pos]
+            mercado_pos   = [p for p in mercado if p.get('position') == pos and _get_val(p, 'ptos_total') > 0]
 
             if not jugadores_pos or not mercado_pos:
                 continue
 
+            # El peor de mi equipo (menor ROI)
             peor  = min(jugadores_pos, key=lambda x: _get_val(x, 'ptos_por_euro'))
+            # El mejor del mercado (mayor ROI)
             mejor = max(mercado_pos,   key=lambda x: _get_val(x, 'ptos_por_euro'))
 
             roi_peor  = _get_val(peor,  'ptos_por_euro')
             roi_mejor = _get_val(mejor, 'ptos_por_euro')
 
-            if roi_mejor > roi_peor:
+            # Si forzamos, lo añadimos siempre. Si no, solo si mejora.
+            if forzar or (roi_mejor > roi_peor):
                 ganancia = roi_mejor - roi_peor
-                informe.append(f"  [{pos}] VENDER: {peor['name']} ({peor.get('price','?')}M, ROI {peor.get('ptos_por_euro','?')})")
-                informe.append(f"  [{pos}] FICHAR: {mejor['name']} ({mejor.get('price','?')}M, ROI {mejor.get('ptos_por_euro','?')})")
-                informe.append(f"  Mejora ROI: +{ganancia:.1f} puntos/millón")
+                informe.append(f"  [{pos}]")
+                informe.append(f"  - VENDER: {peor['name']} ({peor.get('price','?')}M, ROI {peor.get('ptos_por_euro','?')})")
+                informe.append(f"  - FICHAR: {mejor['name']} ({mejor.get('price','?')}M, ROI {mejor.get('ptos_por_euro','?')})")
+                if ganancia > 0:
+                    informe.append(f"  - IMPACTO: +{ganancia:.1f} pts/M extra")
+                else:
+                    informe.append(f"  - NOTA: Es la mejor opción, pero tu jugador actual es estadísticamente superior por {abs(ganancia):.1f} pts/M.")
                 informe.append("")
                 recomendaciones += 1
 
         if recomendaciones == 0:
-            informe.append("  Tu plantilla no tiene mejoras claras en el mercado actual por ninguna posición.")
+            informe.append("  Tu plantilla es óptima comparada con el mercado actual en estas posiciones.")
 
         return "\n".join(informe)
     except Exception as e:
@@ -384,7 +406,8 @@ if __name__ == "__main__":
                             3. Cruza esa información con las recomendaciones de cambio.
                             4. RESPUESTA FINAL: Redacta un texto fluido y profesional en español. No copies tablas de datos; explica qué significan (ej: "Tu defensa está sólida pero Mbappé es duda por molestias, así que...").
 
-                            REGLA CRÍTICA: Nunca devuelvas código o JSON al usuario. Usa 'final_answer' para enviar un mensaje redactado por ti."""
+                            REGLA CRÍTICA: Nunca devuelvas código o JSON al usuario. Usa 'final_answer' para enviar un mensaje redactado por ti. 
+                            NUNCA inventes datos, posiciones o equipos. Si no sabes algo, usa buscar_noticias_jugador."""
                                 )
 
     agente = CodeAgent(

@@ -37,7 +37,7 @@ def _get_nl_model() -> LiteLLMModel:
     if os.getenv("GOOGLE_API_KEY"):
         return LiteLLMModel(model_id="gemini/gemini-1.5-flash")
     return LiteLLMModel(
-        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:3b')}",
+        model_id=f"ollama/{os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:7b')}",
         api_base=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     )
 
@@ -53,13 +53,18 @@ def buscar(pregunta: str) -> str:
     """
     search_tool = DuckDuckGoSearchTool()
     
-    # Añadimos contexto para evitar resultados raros como el actor de doblaje de anime
-    query_optimizada = f"{pregunta} jugador futbol lesion champions league noticias"
+    # Simplificamos la query para evitar ser demasiado restrictivos
+    query_optimizada = f"{pregunta} jugador champions league"
     
     try:
         # 1. Búsqueda directa
         print(f"  [Web] Consultando DuckDuckGo: {query_optimizada}")
         resultados_raw = search_tool(query_optimizada)
+        
+        # Si no hay resultados, intentar una búsqueda aún más simple
+        if not resultados_raw or "no results" in str(resultados_raw).lower():
+            print(f"  [Web] Sin resultados. Re-intentando búsqueda simple...")
+            resultados_raw = search_tool(pregunta)
         
         if not resultados_raw or "no results" in str(resultados_raw).lower():
             return "No se han encontrado noticias recientes en la web."
