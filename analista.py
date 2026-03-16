@@ -9,6 +9,9 @@ Coordina el pipeline completo como un Manager Agent:
 """
 
 import os
+import re
+import unicodedata
+from datetime import datetime
 from dotenv import load_dotenv
 from smolagents import LiteLLMModel, CodeAgent, tool
 
@@ -35,27 +38,33 @@ def _get_manager_model() -> LiteLLMModel:
 # ---------------------------------------------------------------------------
 
 @tool
-def buscar_noticias_jugadores(nombres: list[str]) -> str:
-    """Busca información reciente en internet sobre el estado de forma, lesiones
-    y situación actual de una lista de jugadores para el Fantasy de la Champions.
-    Usa esta herramienta para conseguir contexto real antes de decidir fichajes.
+def recomendar_cambios_desde_datos(posicion_objetivo: str = "") -> str:
+    """Genera recomendaciones SOLO desde los scripts de datos internos.
+    No usa web para no mezclar señales externas en fichajes/ventas.
 
     Args:
-        nombres: Lista de nombres de jugadores a buscar, ej: ["Vinicius", "Haaland"].
+        posicion_objetivo: Opcional (POR, DEF, CEN, DEL).
+    """
+    from agent import evaluar_mercado_fichajes, obtener_recomendaciones_cambio
+
+    mercado = evaluar_mercado_fichajes()
+    recomendaciones = obtener_recomendaciones_cambio(posicion_objetivo)
+    return f"{recomendaciones}\n\n=== MERCADO (SCRIPT INTERNO) ===\n{mercado}"
+
+
+@tool
+def estado_forma_jugador_actual(nombre: str) -> str:
+    """Consulta noticias recientes y resume el estado de forma actual.
+
+    Args:
+        nombre: Nombre del jugador (ej: Mbappé).
     """
     from buscador import buscar
-    
-    resultados = []
-    for nombre in nombres:
-        print(f"[Buscador] Buscando: {nombre}...")
-        try:
-            info = buscar(f"{nombre} forma actual Champions League 2025")
-            resultados.append(f"[{nombre}]\n{info}")
-        except Exception as e:
-            resultados.append(f"[{nombre}]\nError al buscar: {e}")
-            
-    return "\n\n".join(resultados) if resultados else "Sin información web disponible."
 
+    year = datetime.now().year
+    query = f"{nombre} estado de forma lesion actualidad champions league hoy {year}"
+    resumen = buscar(query)
+    return f"=== ESTADO ACTUAL DE {nombre.upper()} ===\n{resumen}"
 
 # ---------------------------------------------------------------------------
 # Manager Agent
@@ -66,7 +75,6 @@ def analizar(presupuesto: float) -> str:
     Instancia el Agent orquestador (Manager) para análisis automático.
     """
     from agent import evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador
-    from smolagents import ToolCallingAgent
     
     INSTRUCTIONS = f"""Eres el Analista Orquestador de UCL Fantasy. Tu misión es dar recomendaciones basadas 100% en DATOS.
 
@@ -78,6 +86,8 @@ REGLAS DE ORO:
 
     model = _get_manager_model()
     
+    from smolagents import ToolCallingAgent
+
     manager = ToolCallingAgent(
         tools=[evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador],
         model=model,
@@ -89,49 +99,114 @@ REGLAS DE ORO:
     resultado = manager.run("Realiza un análisis completo: evalúa mi plantilla, mira el mercado y dame recomendaciones finales.")
     return resultado
 
-def chatear(mensaje: str, historial: list, presupuesto: float) -> tuple[str, list]:
+def chatear(mensaje: str, historial: list, presupuesto: float, original_msg: str = "") -> tuple[str, list]:
+    """Versión interactiva del analista para modo Chatbot.
+    Usa razonamiento + planificación + ejecución con selección de herramientas.
     """
-    Versión interactiva del analista para modo Chatbot.
-    Cada llamada es "fresca" sin memoria persistente para evitar errores.
-    """
-    from agent import buscar_noticias_jugador, evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio
+    from agent import evaluar_plantilla_actual, evaluar_mercado_fichajes
     from smolagents import ToolCallingAgent
-    
-    INSTRUCTIONS = f"""Eres el Analista Quirúrgico de UCL Fantasy. Tu misión es responder EXCLUSIVAMENTE a lo que se te pide usando la herramienta adecuada.
 
-REGLAS DE ORO:
-1. SIEMPRE RESPONDE EN ESPAÑOL.
-2. MODULARIDAD DE HERRAMIENTAS:
-   - Si piden opinión del EQUIPO: Usa 'evaluar_plantilla_actual()'.
-   - Si piden opinión del MERCADO: Usa 'evaluar_mercado_fichajes()'.
-   - Si piden FICHAJES/RECOMENDACIONES: Usa 'obtener_recomendaciones_cambio()'.
-3. BUSCADOR (Contexto Real): Si vas a recomendar un fichaje o evaluar a un crack, usa 'buscar_noticias_jugador(nombre)' para ver si está lesionado o en baja forma. ¡Aporta este valor extra!
-4. RESPUESTA QUIRÚRGICA: Si preguntan por el equipo, no hables del mercado. Si preguntan por cambios, no listes a todo el equipo. Solo entrega la sección correspondiente.
-5. SIN INTRODUCCIONES: Ve directo al grano con los datos.
-6. BASO TODO EN DATOS (G, A, R, ROI).
+    INSTRUCTIONS = """Eres un analista de UCL Fantasy. Trabajas como agente (no chatbot simple):
+1) Razonas la intención.
+2) Planificas qué herramienta usar.
+3) Ejecutas herramientas y respondes SOLO con datos obtenidos.
+
+Herramientas disponibles:
+- evaluar_plantilla_actual()
+- evaluar_mercado_fichajes()
+- recomendar_cambios_desde_datos(posicion_objetivo)
+- estado_forma_jugador_actual(nombre)
+
+Reglas de uso obligatorias:
+- Si piden evaluar equipo/plantilla: usa evaluar_plantilla_actual().
+- Si piden oportunidades de mercado: usa evaluar_mercado_fichajes().
+- Si piden fichajes/ventas/cambios: usa SIEMPRE recomendar_cambios_desde_datos(...). No uses web en ese caso.
+- Si la consulta menciona "delantero", usa posicion_objetivo="DEL". Si menciona defensa/centro/portero, usa DEF/CEN/POR.
+- Si preguntan por un jugador concreto (estado actual, lesiones, forma, si venderlo): DEBES usar estado_forma_jugador_actual(nombre).
+- Si piden fichajes y mencionan una posición concreta (por ejemplo, delantero), respeta esa posición en la respuesta final y descarta propuestas de otras líneas.
+- Si piden “analiza mi equipo”, devuelve el texto completo del análisis, no un resumen corto.
+- Responde siempre en español, de forma breve y clara.
+- No reutilices respuestas anteriores ni inventes datos; apóyate en herramientas.
 """
 
     model = _get_manager_model()
-    
     manager = ToolCallingAgent(
-        tools=[evaluar_plantilla_actual, evaluar_mercado_fichajes, obtener_recomendaciones_cambio, buscar_noticias_jugador],
+        tools=[
+            evaluar_plantilla_actual,
+            evaluar_mercado_fichajes,
+            recomendar_cambios_desde_datos,
+            estado_forma_jugador_actual,
+        ],
         model=model,
         instructions=INSTRUCTIONS,
-        max_steps=10, # Aumentamos para permitir búsqueda + análisis
+        max_steps=10,
     )
-    
-    prompt_final = f"""MENSAJE DEL USUARIO: {mensaje}
 
-RECUERDA: Identifica la intención del usuario y usa SOLO la herramienta necesaria. Si es relevante, busca noticias del jugador antes de dar el veredicto final.
+    msg_display = (original_msg or mensaje or "").strip()
+    print(f"[Analista-Chat] Pregunta: {msg_display}")
+
+    def _norm(txt: str) -> str:
+        t = unicodedata.normalize("NFD", txt or "")
+        t = "".join(ch for ch in t if unicodedata.category(ch) != "Mn")
+        return t.lower()
+
+    qn = _norm(msg_display)
+
+    # Fuera de dominio: el agente solo responde sobre fantasy UCL.
+    q = msg_display.lower()
+    dominio_hits = [
+        "equipo", "plantilla", "mercado", "fichaj", "vender", "venta", "jugador",
+        "champions", "ucl", "mbappe", "osimhen", "grimaldo", "gordon", "vitinha",
+        "delantero", "defensa", "centrocamp", "portero", "lesion", "forma"
+    ]
+    if not any(k in q for k in dominio_hits):
+        respuesta = "Solo puedo ayudar con consultas de Fantasy UCL (plantilla, mercado, fichajes, ventas y estado de jugadores)."
+        historial.append({"role": "user", "content": msg_display})
+        historial.append({"role": "assistant", "content": respuesta})
+        return respuesta, historial
+
+    # Forzar salida útil cuando piden análisis de plantilla: texto completo sin resumir.
+    if any(k in qn for k in ["analiza mi equipo", "analiza mi plantilla", "evalua mi equipo", "evalua mi plantilla"]):
+        resultado = evaluar_plantilla_actual()
+        historial.append({"role": "user", "content": msg_display})
+        historial.append({"role": "assistant", "content": resultado})
+        return resultado, historial
+
+    # Fichajes/ventas: usar scripts internos y no web general.
+    if any(k in qn for k in ["fich", "vender", "ventas", "comprar", "cambio"]):
+        pos = ""
+        if "delanter" in qn:
+            pos = "DEL"
+        elif "defens" in qn:
+            pos = "DEF"
+        elif "centro" in qn or "medio" in qn:
+            pos = "CEN"
+        elif "porter" in qn:
+            pos = "POR"
+        resultado = recomendar_cambios_desde_datos(pos)
+        historial.append({"role": "user", "content": msg_display})
+        historial.append({"role": "assistant", "content": resultado})
+        return resultado, historial
+
+    # Estado de forma de jugador: búsqueda actualizada.
+    if any(k in qn for k in ["estado de forma", "actual", "lesion", "informacion"]) and "mbappe" in qn:
+        resultado = estado_forma_jugador_actual("Mbappé")
+        historial.append({"role": "user", "content": msg_display})
+        historial.append({"role": "assistant", "content": resultado})
+        return resultado, historial
+
+    prompt_final = f"""CONTEXTO: {mensaje}
+CONSULTA DEL USUARIO: {msg_display}
+
+Ejecuta el circuito completo de agente: razonamiento, planificación y uso de herramientas según corresponda.
 """
-    
+
     resultado = manager.run(prompt_final)
-    
-    # Actualizar historial
-    historial.append({"role": "user", "content": mensaje})
-    historial.append({"role": "assistant", "content": str(resultado)})
-    
-    return str(resultado), historial
+    resultado = str(resultado)
+
+    historial.append({"role": "user", "content": msg_display})
+    historial.append({"role": "assistant", "content": resultado})
+    return resultado, historial
 
 
 # ---------------------------------------------------------------------------

@@ -62,7 +62,7 @@
             <!-- Formacion -->
             <div class="sidebar-section">
                 <h3>Formacion</h3>
-                <div class="formation-grid" id="formation-grid"></div>
+                <select id="formation-select" class="formation-select"></select>
             </div>
 
             <!-- Squad Info -->
@@ -99,6 +99,18 @@
                 </div>
             </div>
 
+            <div class="sidebar-section">
+                <h3>Cargar plantilla</h3>
+                <div class="save-bar" style="margin-bottom: 8px;">
+                    <select id="load-template-select" style="flex: 1; height: 32px; border-radius: 6px; border: 1px solid rgba(40, 80, 140, 0.5); background: rgba(10, 20, 50, 0.8); color: #c0d0e8; font-size: 0.76rem; padding: 0 10px;">
+                        <option value="">Sin plantillas guardadas</option>
+                    </select>
+                </div>
+                <button class="btn-clear" id="btn-load-template" onclick="loadSavedTemplate()" style="border-color: #4db8ff; color: #4db8ff;">
+                    Cargar Seleccionada
+                </button>
+            </div>
+
             <!-- Acciones -->
             <div class="sidebar-section">
                 <h3>Acciones</h3>
@@ -120,16 +132,6 @@
                 </button>
             </div>
 
-            <!-- Análisis IA -->
-            <div class="sidebar-section">
-                <h3>Análisis IA</h3>
-                <div class="save-bar" style="margin-bottom:8px;">
-                    <input type="number" id="presupuesto-input" placeholder="Presupuesto (M)" min="0" step="0.5" style="border-radius:6px; border-right:1px solid rgba(40,80,140,0.5);">
-                </div>
-                <button class="btn-analyze" id="btn-analyze" disabled onclick="toggleChat()">
-                    Charlar con el Analista
-                </button>
-            </div>
         </aside>
 
         <!-- CAMPO DE FUTBOL -->

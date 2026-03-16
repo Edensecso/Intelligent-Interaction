@@ -79,9 +79,15 @@ def buscar(pregunta: str) -> str:
         ]
         
         respuesta = model(messages)
-        return respuesta.content
+        content = respuesta.content
+        if isinstance(content, list):
+            return " ".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            )
+        return str(content)
     except Exception as e:
-        return f"Error en la búsqueda web: {str(e)}"
+        return f"Error en la b\u00fasqueda web: {str(e)}"
 
 
 # ---------------------------------------------------------------------------

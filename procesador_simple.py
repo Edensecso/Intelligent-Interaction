@@ -49,7 +49,13 @@ def _llamar_llm(model: LiteLLMModel, instruccion: str, datos: list[dict]) -> str
         }
     ]
     respuesta = model(messages)
-    return respuesta.content
+    content = respuesta.content
+    if isinstance(content, list):
+        return " ".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content)
 
 
 # ---------------------------------------------------------------------------

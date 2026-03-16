@@ -6,9 +6,27 @@ import os
 app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
-app.secret_key = 'ucl_fantasy_secret_key' # Para persistir historial de chat
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_only_local_secret')  # No exponer secretos en código
 
 PLAYERS_FILE = os.path.join(os.path.dirname(__file__), 'players.json')
+BASE_DIR = os.path.dirname(__file__)
+PLANTILLAS_DIR = os.path.join(BASE_DIR, 'plantillas')
+CURRENT_PLANTILLA_FILE = os.path.join(BASE_DIR, 'plantilla.json')
+
+
+def ensure_plantillas_dir():
+    os.makedirs(PLANTILLAS_DIR, exist_ok=True)
+
+
+def persist_current_squad(squad_data):
+    """Guarda la plantilla actual para que el analista siempre pueda leer contexto."""
+    with open(CURRENT_PLANTILLA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(squad_data, f, ensure_ascii=False, indent=4)
+
+    ensure_plantillas_dir()
+    last_path = os.path.join(PLANTILLAS_DIR, 'plantilla_actual.json')
+    with open(last_path, 'w', encoding='utf-8') as f:
+        json.dump(squad_data, f, ensure_ascii=False, indent=4)
 
 def load_players():
     with open(PLAYERS_FILE, 'r', encoding='utf-8') as f:
@@ -31,36 +49,83 @@ def get_players():
     if search:
         players = [p for p in players if search in p.get('name', '').lower()]
 
+    def _safe_pts(p):
+        try:
+            v = str(p.get('ptos_total', '0')).replace('m', '').replace('-', '0').strip()
+            return int(float(v)) if v else 0
+        except (ValueError, TypeError):
+            return 0
+
     # Ordenar por puntos totales descendente
-    players.sort(key=lambda p: int(p.get('ptos_total', '0')), reverse=True)
+    players.sort(key=_safe_pts, reverse=True)
     return jsonify(players)
 
 @app.route('/api/save', methods=['POST'])
 def save_squad():
-    """Guarda la plantilla como archivo .json con el mismo formato que players.json."""
+    """Guarda la plantilla en la carpeta plantillas/."""
     data = request.get_json()
-    filename = data.get('filename', 'mi_equipo')
+    filename = str(data.get('filename', 'mi_equipo')).strip() or 'mi_equipo'
     squad = data.get('squad', [])
 
     if not filename.endswith('.json'):
         filename += '.json'
 
-    output_path = os.path.join(os.path.dirname(__file__), filename)
+    safe_name = os.path.basename(filename)
+    ensure_plantillas_dir()
+    output_path = os.path.join(PLANTILLAS_DIR, safe_name)
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(squad, f, ensure_ascii=False, indent=4)
 
-    return jsonify({'success': True, 'path': output_path})
+    return jsonify({'success': True, 'path': output_path, 'filename': safe_name})
+
+
+@app.route('/api/templates')
+def list_templates():
+    """Lista plantillas guardadas en la carpeta plantillas/."""
+    try:
+        ensure_plantillas_dir()
+        files = [
+            name for name in os.listdir(PLANTILLAS_DIR)
+            if name.lower().endswith('.json') and os.path.isfile(os.path.join(PLANTILLAS_DIR, name))
+        ]
+        files.sort()
+        return jsonify({'success': True, 'templates': files})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/templates/load', methods=['POST'])
+def load_template():
+    """Carga una plantilla guardada desde plantillas/."""
+    data = request.get_json()
+    filename = str(data.get('filename', '')).strip()
+    if not filename:
+        return jsonify({'success': False, 'error': 'Nombre de plantilla vacío'}), 400
+
+    safe_name = os.path.basename(filename)
+    path = os.path.join(PLANTILLAS_DIR, safe_name)
+    if not os.path.exists(path):
+        return jsonify({'success': False, 'error': 'Plantilla no encontrada'}), 404
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            squad_data = json.load(f)
+        if not isinstance(squad_data, list):
+            return jsonify({'success': False, 'error': 'Formato de plantilla no válido'}), 400
+
+        persist_current_squad(squad_data)
+        return jsonify({'success': True, 'squad': squad_data, 'filename': safe_name})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/sync_squad', methods=['POST'])
 def sync_squad():
     """Sincronización silenciosa de la plantilla actual para que el Analista la conozca."""
     data = request.get_json()
     squad_data = data.get('squad', [])
-    
-    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
+
     try:
-        with open(plantilla_path, 'w', encoding='utf-8') as f:
-            json.dump(squad_data, f, ensure_ascii=False, indent=4)
+        persist_current_squad(squad_data)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -72,10 +137,8 @@ def analizar():
     squad_data = data.get('squad', [])
     presupuesto = float(data.get('presupuesto', 0))
 
-    # Guardar plantilla para que analista.py la lea en ejecutar_pipeline()
-    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
-    with open(plantilla_path, 'w', encoding='utf-8') as f:
-        json.dump(squad_data, f, ensure_ascii=False, indent=4)
+    # Guardar plantilla para que analista.py la lea
+    persist_current_squad(squad_data)
 
     try:
         from analista import analizar
@@ -97,18 +160,39 @@ def chat():
     if 'chat_history' not in session:
         session['chat_history'] = []
 
-    # Guardar plantilla actual (por si el agente necesita leerla)
-    plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla.json')
-    with open(plantilla_path, 'w', encoding='utf-8') as f:
-        json.dump(squad_data, f, ensure_ascii=False, indent=4)
+    # Si el cliente no envía plantilla, usamos la última conocida persistida.
+    if not squad_data and os.path.exists(CURRENT_PLANTILLA_FILE):
+        try:
+            with open(CURRENT_PLANTILLA_FILE, 'r', encoding='utf-8') as f:
+                loaded = json.load(f)
+            if isinstance(loaded, list):
+                squad_data = loaded
+        except Exception:
+            pass
+
+    persist_current_squad(squad_data)
 
     try:
         from analista import chatear
-        # Enviamos historial vacío para que no tenga "memoria" de errores pasados
-        respuesta, _ = chatear(user_msg, [], presupuesto)
-        
-        # Ya no guardamos el historial en la sesión
-        session['chat_history'] = []
+        plantilla_contexto = "Sin plantilla cargada."
+        if squad_data:
+            nombres = [p.get('name', '?') for p in squad_data if isinstance(p, dict)]
+            plantilla_contexto = f"Jugadores ({len(nombres)}): " + ", ".join(nombres)
+
+        user_msg_with_context = (
+            f"PLANTILLA ACTUAL: {plantilla_contexto}\n"
+            f"PREGUNTA: {user_msg}"
+        )
+
+        respuesta, updated_history = chatear(
+            user_msg_with_context,
+            session.get('chat_history', []),
+            presupuesto,
+            original_msg=user_msg,
+        )
+
+        session['chat_history'] = updated_history
+        session.modified = True
         
         return jsonify({'success': True, 'response': str(respuesta)})
     except Exception as e:

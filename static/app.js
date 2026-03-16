@@ -107,7 +107,8 @@ let activeSlotIndex = null;
 document.addEventListener('DOMContentLoaded', () => {
     loadPlayers();
     loadCurrentMarket(); // Cargar mercado guardado si existe
-    renderFormationButtons();
+    renderFormationSelector();
+    loadTemplatesList();
     setFormation('433');
     updateSquadInfo();
 });
@@ -189,25 +190,37 @@ async function triggerScraping() {
 }
 
 // ---------- FORMACIONES ----------
-function renderFormationButtons() {
-    const grid = document.getElementById('formation-grid');
+function renderFormationSelector() {
+    const select = document.getElementById('formation-select');
+    if (!select) return;
+
     const formations = Object.keys(FORMATION_LAYOUTS);
-    grid.innerHTML = '';
-    formations.forEach(f => {
-        const btn = document.createElement('button');
-        btn.className = 'formation-btn' + (f === currentFormation ? ' active' : '');
-        btn.textContent = f.split('').join('-');
-        btn.addEventListener('click', () => setFormation(f));
-        grid.appendChild(btn);
-    });
+    select.innerHTML = formations
+        .map(f => `<option value="${f}">${f.split('').join('-')}</option>`)
+        .join('');
+
+    select.value = currentFormation;
+    select.onchange = () => setFormation(select.value);
 }
 
 function setFormation(f) {
+    if (!FORMATION_LAYOUTS[f]) return;
+
+    const hadPlayers = squad.some(Boolean);
+    if (hadPlayers && f !== currentFormation) {
+        const ok = confirm('Cambiar la formación vaciará la plantilla actual. ¿Continuar?');
+        if (!ok) {
+            const select = document.getElementById('formation-select');
+            if (select) select.value = currentFormation;
+            return;
+        }
+    }
+
     currentFormation = f;
     squad = new Array(11).fill(null);
-    document.querySelectorAll('.formation-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.replace(/-/g, '') === f);
-    });
+    const select = document.getElementById('formation-select');
+    if (select) select.value = f;
+
     renderPitch();
     updateSquadInfo();
 }
@@ -436,15 +449,90 @@ async function saveSquad() {
     const res = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, squad: orderedSquad }),
+        body: JSON.stringify({ filename, squad: orderedSquad, formation: currentFormation }),
     });
 
     const data = await res.json();
 
     if (data.success) {
         showToast('Plantilla guardada como ' + filename + '.json');
+        loadTemplatesList();
     } else {
         showToast('Error al guardar', true);
+    }
+}
+
+async function loadTemplatesList() {
+    const select = document.getElementById('load-template-select');
+    const loadBtn = document.getElementById('btn-load-template');
+    if (!select || !loadBtn) return;
+
+    try {
+        const res = await fetch('/api/templates');
+        const data = await res.json();
+
+        if (!data.success || !Array.isArray(data.templates) || data.templates.length === 0) {
+            select.innerHTML = '<option value="">Sin plantillas guardadas</option>';
+            loadBtn.disabled = true;
+            return;
+        }
+
+        select.innerHTML = data.templates
+            .map(name => `<option value="${escapeAttr(name)}">${name}</option>`)
+            .join('');
+        loadBtn.disabled = false;
+    } catch (e) {
+        select.innerHTML = '<option value="">Error al cargar</option>';
+        loadBtn.disabled = true;
+    }
+}
+
+function applyLoadedSquadToFormation(loadedPlayers) {
+    const byPosition = {
+        POR: loadedPlayers.filter(p => p.position === 'POR'),
+        DEF: loadedPlayers.filter(p => p.position === 'DEF'),
+        CEN: loadedPlayers.filter(p => p.position === 'CEN'),
+        DEL: loadedPlayers.filter(p => p.position === 'DEL'),
+    };
+
+    const layout = FORMATION_LAYOUTS[currentFormation];
+    const nextSquad = new Array(11).fill(null);
+
+    layout.forEach((slot, idx) => {
+        const list = byPosition[slot.pos] || [];
+        nextSquad[idx] = list.length > 0 ? list.shift() : null;
+    });
+
+    squad = nextSquad;
+    renderPitch();
+    updateSquadInfo();
+}
+
+async function loadSavedTemplate() {
+    const select = document.getElementById('load-template-select');
+    if (!select || !select.value) {
+        showToast('Selecciona una plantilla', true);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/templates/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: select.value }),
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast('Error al cargar: ' + (data.error || 'desconocido'), true);
+            return;
+        }
+
+        const loadedPlayers = Array.isArray(data.squad) ? data.squad : [];
+        applyLoadedSquadToFormation(loadedPlayers);
+        showToast('Plantilla cargada: ' + select.value);
+    } catch (e) {
+        showToast('Error de conexión al cargar plantilla', true);
     }
 }
 
@@ -557,13 +645,14 @@ async function sendChatMessage() {
     appendMessage('bot', '...', typingId);
 
     try {
+        const presupuestoEl = document.getElementById('presupuesto-input');
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: text,
                 squad: squad.filter(Boolean),
-                presupuesto: parseFloat(document.getElementById('presupuesto-input').value) || 0
+                presupuesto: presupuestoEl ? parseFloat(presupuestoEl.value) || 0 : 0
             }),
         });
 

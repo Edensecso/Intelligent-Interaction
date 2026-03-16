@@ -278,14 +278,18 @@ def evaluar_mercado_fichajes() -> str:
         return f"Error en evaluación de mercado: {str(e)}"
 
 @tool
-def obtener_recomendaciones_cambio() -> str:
+def obtener_recomendaciones_cambio(posicion_objetivo: str = "") -> str:
     """Sugiere cambios estratégicos (Quién vender y quién fichar).
-    Compara el ROI bajo de tu equipo con el ROI alto del mercado.
+    Compara el ROI bajo de tu equipo con el ROI alto del mercado RESPETANDO LA POSICIÓN.
+    Nunca sugiere vender un DEF para fichar un DEL ni posiciones cruzadas.
+
+    Args:
+        posicion_objetivo: Opcional. Una de POR, DEF, CEN, DEL para limitar la recomendación.
     """
     base_dir = os.path.dirname(__file__)
     equipo_file = os.path.join(base_dir, "plantilla.json")
     mercado_file = os.path.join(base_dir, "mercado.json")
-    
+
     if not os.path.exists(equipo_file) or not os.path.exists(mercado_file):
         return "Error: Se requieren plantilla y mercado para recomendar cambios."
 
@@ -293,16 +297,38 @@ def obtener_recomendaciones_cambio() -> str:
         with open(equipo_file, encoding="utf-8") as f: equipo = json.load(f)
         with open(mercado_file, encoding="utf-8") as f: mercado = json.load(f)
 
-        peores_equipo = sorted(equipo, key=lambda x: _get_val(x, 'ptos_por_euro'))[:2]
-        mejores_mercado = sorted(mercado, key=lambda x: _get_val(x, 'ptos_por_euro'), reverse=True)[:2]
+        informe = ["=== RECOMENDACIONES DE CAMBIO (por posición) ==="]
+        recomendaciones = 0
 
-        informe = ["=== ⚠️ RECOMENDACIONES DE CAMBIO ==="]
-        for v, f in zip(peores_equipo, mejores_mercado):
-            informe.append(f"  - VENDER: {v['name']} ({v['price']}M, ROI {v.get('ptos_por_euro','?')})")
-            informe.append(f"  - FICHAR: {f['name']} ({f['price']}M, ROI {f.get('ptos_por_euro','?')})")
-            informe.append(f"  - MOTIVO: Optimización de rentabilidad.")
-            informe.append("")
-        
+        posiciones = ['POR', 'DEF', 'CEN', 'DEL']
+        pos_obj = (posicion_objetivo or "").strip().upper()
+        if pos_obj in posiciones:
+            posiciones = [pos_obj]
+
+        for pos in posiciones:
+            jugadores_pos = [p for p in equipo if p.get('position') == pos]
+            mercado_pos   = [p for p in mercado if p.get('position') == pos]
+
+            if not jugadores_pos or not mercado_pos:
+                continue
+
+            peor  = min(jugadores_pos, key=lambda x: _get_val(x, 'ptos_por_euro'))
+            mejor = max(mercado_pos,   key=lambda x: _get_val(x, 'ptos_por_euro'))
+
+            roi_peor  = _get_val(peor,  'ptos_por_euro')
+            roi_mejor = _get_val(mejor, 'ptos_por_euro')
+
+            if roi_mejor > roi_peor:
+                ganancia = roi_mejor - roi_peor
+                informe.append(f"  [{pos}] VENDER: {peor['name']} ({peor.get('price','?')}M, ROI {peor.get('ptos_por_euro','?')})")
+                informe.append(f"  [{pos}] FICHAR: {mejor['name']} ({mejor.get('price','?')}M, ROI {mejor.get('ptos_por_euro','?')})")
+                informe.append(f"  Mejora ROI: +{ganancia:.1f} puntos/millón")
+                informe.append("")
+                recomendaciones += 1
+
+        if recomendaciones == 0:
+            informe.append("  Tu plantilla no tiene mejoras claras en el mercado actual por ninguna posición.")
+
         return "\n".join(informe)
     except Exception as e:
         return f"Error en recomendaciones: {str(e)}"
@@ -313,13 +339,24 @@ def obtener_recomendaciones_cambio() -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    agente = crear_agente()
+    agente = ToolCallingAgent(
+        tools=[
+            evaluar_plantilla_actual,
+            evaluar_mercado_fichajes,
+            obtener_recomendaciones_cambio,
+            buscar_noticias_jugador,
+            load_team,
+            load_market,
+        ],
+        model=get_agent_model(),
+        max_steps=8,
+    )
 
     print("=== Agente Ejecutor Fantasy UCL ===")
     print("Comandos: analiza mi equipo, actualiza jugadores, (o 'salir')\n")
 
     while True:
-        pregunta = input("Tú: ").strip()
+        pregunta = input("T\u00fa: ").strip()
         if pregunta.lower() in ("salir", "exit", "q"):
             print("¡Hasta luego!")
             break

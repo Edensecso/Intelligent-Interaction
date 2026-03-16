@@ -10,6 +10,11 @@ def shuffle_team(players_file="players.json"):
     with open(players_file, 'r', encoding='utf-8') as f:
         players = json.load(f)
         
+    # Normalizar posición MED -> CEN (el scraper puede devolver ambas)
+    for p in players:
+        if p.get('position') == 'MED':
+            p['position'] = 'CEN'
+
     # Separar jugadores por posición según indica el JSON
     por_list = [p for p in players if p.get('position') == 'POR']
     def_list = [p for p in players if p.get('position') == 'DEF']
@@ -37,8 +42,8 @@ def shuffle_team(players_file="players.json"):
         selected_cen = random.sample(cen_list, num_cen)
         selected_del = random.sample(del_list, num_del)
     except ValueError as e:
-        print("Error: No hay suficientes jugadores en alguna posición para formar el equipo.")
-        return
+        print("Error: No hay suficientes jugadores en alguna posici\u00f3n para formar el equipo.")
+        return None
         
     team = selected_por + selected_def + selected_cen + selected_del
     
